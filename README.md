@@ -21,3 +21,34 @@ This repository owns the user-facing workspace, session, voting, and result view
 - Mercure `EventSource` subscriptions for result update notifications.
 - JWT-based authenticated requests.
 
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` to `http://127.0.0.1:8000`. Configure these values with:
+
+```text
+VITE_API_BASE_URL=/api
+VITE_MERCURE_URL=http://127.0.0.1:3001/.well-known/mercure
+```
+
+## Implemented MVP Flow
+
+- Register and login.
+- Persist auth state in `localStorage`.
+- List and create workspaces.
+- Add registered workspace members by email.
+- List, create, open, and close decision sessions.
+- Add options while a session is in draft.
+- Cast majority and ranked IRV votes.
+- Read result snapshots and refetch after Mercure `result_updated` events.
+
+## Verification
+
+```bash
+npm run build
+npm test
+```
