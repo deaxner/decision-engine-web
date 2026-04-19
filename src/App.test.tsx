@@ -62,8 +62,8 @@ describe('Decision Engine web MVP', () => {
   test('auth form stores user and opens the dashboard', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
-      if (url.endsWith('/register')) {
-        return json(auth, 201);
+      if (url.endsWith('/login')) {
+        return json(auth);
       }
       if (url.endsWith('/workspaces')) {
         return json([]);
@@ -73,10 +73,11 @@ describe('Decision Engine web MVP', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Display name')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@example.test' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-password' } });
-    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Owner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText('Workspace decisions')).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem('decision-engine-auth') as string)).toEqual(auth);
@@ -287,7 +288,7 @@ describe('Decision Engine web MVP', () => {
       winning_option_id: '101',
       result_data: {
         winner: '101',
-        rounds: [],
+        rounds: [{ type: 'MAJORITY', counts: { '100': 1, '101': 2 } }],
         total_votes: 3,
         computed_at: '2026-04-18T20:01:00+00:00',
       },
@@ -318,6 +319,10 @@ describe('Decision Engine web MVP', () => {
     MockEventSource.instances[0].dispatchEvent(new MessageEvent('result_updated'));
 
     expect(await screen.findByText('3')).toBeInTheDocument();
+    expect(screen.getByText('Result breakdown')).toBeInTheDocument();
+    expect(screen.getAllByText('A').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('B').length).toBeGreaterThan(1);
+    expect(screen.getByText('Winner')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20', expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20/results', expect.any(Object));
   });

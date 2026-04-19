@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { clearAuth, loadAuth, saveAuth } from './storage';
 import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace } from './types';
@@ -21,8 +21,14 @@ export default function App() {
   const [sessions, setSessions] = useState<DecisionSession[]>([]);
   const [session, setSession] = useState<DecisionSession | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
+  const [sessionsByWorkspace, setSessionsByWorkspace] = useState<Record<string, DecisionSession[]>>({});
+  const [resultsBySession, setResultsBySession] = useState<Record<string, SessionResult | null>>({});
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingResult, setLoadingResult] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const activeWorkspaceId = useRef<string | null>(null);
+  const activeSessionId = useRef<string | null>(null);
 
   const token = auth?.token ?? '';
 
@@ -50,8 +56,17 @@ export default function App() {
     if (!currentWorkspace || !token) {
       return;
     }
-    const items = await api.listSessions(token, currentWorkspace.id);
-    setSessions(items);
+    setLoadingSessions(true);
+    try {
+      const items = await api.listSessions(token, currentWorkspace.id);
+      setSessionsByWorkspace((cache) => ({ ...cache, [currentWorkspace.id]: items }));
+      if (activeWorkspaceId.current === currentWorkspace.id) {
+        setSessions(items);
+        setSession((current) => (current ? items.find((item) => item.id === current.id) ?? current : current));
+      }
+    } finally {
+      setLoadingSessions(false);
+    }
   }
 
   async function refreshSession(currentSession = session) {
@@ -67,7 +82,16 @@ export default function App() {
       setResult(null);
       return;
     }
-    setResult(await api.getResult(token, currentSession.id));
+    setLoadingResult(true);
+    try {
+      const latest = await api.getResult(token, currentSession.id);
+      setResultsBySession((cache) => ({ ...cache, [currentSession.id]: latest }));
+      if (activeSessionId.current === currentSession.id) {
+        setResult(latest);
+      }
+    } finally {
+      setLoadingResult(false);
+    }
   }
 
   useEffect(() => {
@@ -77,10 +101,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    activeWorkspaceId.current = workspace?.id ?? null;
     void run(refreshSessions);
   }, [workspace?.id]);
 
   useEffect(() => {
+    activeSessionId.current = session?.id ?? null;
     void run(refreshResult);
   }, [session?.id, session?.status]);
 
@@ -150,7 +176,10 @@ export default function App() {
             workspaces={workspaces}
             active={workspace}
             onSelect={(next) => {
+              activeWorkspaceId.current = next.id;
+              activeSessionId.current = null;
               setWorkspace(next);
+              setSessions(sessionsByWorkspace[next.id] ?? []);
               setSession(null);
               setResult(null);
             }}
@@ -180,12 +209,20 @@ export default function App() {
               <SessionBoard
                 sessions={sessions}
                 active={session}
-                onSelect={(next) => setSession(next)}
+                loading={loadingSessions}
+                onSelect={(next) => {
+                  activeSessionId.current = next.id;
+                  setSession(next);
+                  setResult(resultsBySession[next.id] ?? null);
+                }}
                 onCreate={(payload) =>
                   run(async () => {
                     const created = await api.createSession(token, workspace.id, payload);
-                    setSessions((items) => [created, ...items]);
+                    const nextSessions = [created, ...sessions];
+                    setSessions(nextSessions);
+                    setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
                     setSession(created);
+                    setResult(null);
                     setNotice('Decision session created.');
                   })
                 }
@@ -194,6 +231,7 @@ export default function App() {
                 <SessionDetail
                   session={session}
                   result={result}
+                  loadingResult={loadingResult}
                   onAddOption={(title) =>
                     run(async () => {
                       await api.addOption(token, session.id, title);
@@ -206,6 +244,7 @@ export default function App() {
                     run(async () => {
                       const updated = await api.updateSessionStatus(token, session.id, status);
                       setSession(updated);
+                      setSessions((items) => items.map((item) => (item.id === updated.id ? updated : item)));
                       await refreshSessions(workspace);
                       setNotice(status === 'OPEN' ? 'Voting opened.' : 'Session closed.');
                     })
@@ -214,7 +253,6 @@ export default function App() {
                     run(async () => {
                       await api.castVote(token, session, optionIds);
                       setNotice('Vote accepted. Waiting for the result worker.');
-                      await refreshResult(session);
                     })
                   }
                 />
@@ -232,7 +270,7 @@ export default function App() {
 }
 
 function AuthPanel({ onAuth, onError }: { onAuth: (auth: AuthState) => void; onError: (message: string) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('register');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -256,11 +294,11 @@ function AuthPanel({ onAuth, onError }: { onAuth: (auth: AuthState) => void; onE
       <p className="eyebrow">Decision Engine</p>
       <h1>Make the decision visible.</h1>
       <div className="segmented" role="group" aria-label="Authentication mode">
-        <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>
-          Register
-        </button>
         <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
           Login
+        </button>
+        <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>
+          Register
         </button>
       </div>
       <form className="form-grid" onSubmit={submit}>
@@ -374,11 +412,13 @@ function WorkspaceHeader({ workspace, onInvite }: { workspace: Workspace; onInvi
 function SessionBoard({
   sessions,
   active,
+  loading,
   onSelect,
   onCreate,
 }: {
   sessions: DecisionSession[];
   active: DecisionSession | null;
+  loading: boolean;
   onSelect: (session: DecisionSession) => void;
   onCreate: (payload: { title: string; description?: string; voting_type: VotingType }) => void;
 }) {
@@ -417,6 +457,7 @@ function SessionBoard({
         </button>
       </form>
       <div className="session-tabs" role="tablist" aria-label="Decision sessions">
+        {loading ? <p className="inline-status">Refreshing sessions...</p> : null}
         {sessions.map((item) => (
           <button key={item.id} className={active?.id === item.id ? 'active' : ''} onClick={() => onSelect(item)}>
             {item.title}
@@ -431,12 +472,14 @@ function SessionBoard({
 function SessionDetail({
   session,
   result,
+  loadingResult,
   onAddOption,
   onStatus,
   onVote,
 }: {
   session: DecisionSession;
   result: SessionResult | null;
+  loadingResult: boolean;
   onAddOption: (title: string) => void;
   onStatus: (status: 'OPEN' | 'CLOSED') => void;
   onVote: (optionIds: string[]) => void;
@@ -460,7 +503,7 @@ function SessionDetail({
         <OptionsPanel session={session} onAddOption={onAddOption} />
         {session.status === 'OPEN' ? <VotePanel session={session} onVote={onVote} /> : null}
       </div>
-      <ResultsPanel session={session} result={result} />
+      <ResultsPanel session={session} result={result} loading={loadingResult} />
     </section>
   );
 }
@@ -553,12 +596,13 @@ function VotePanel({ session, onVote }: { session: DecisionSession; onVote: (opt
   );
 }
 
-function ResultsPanel({ session, result }: { session: DecisionSession; result: SessionResult | null }) {
+function ResultsPanel({ session, result, loading }: { session: DecisionSession; result: SessionResult | null; loading: boolean }) {
   const winner = session.options.find((option) => option.id === result?.winning_option_id);
 
   return (
     <section className="results-pane" aria-label="Results">
       <p className="eyebrow">Live results</p>
+      {loading ? <p className="inline-status">Refreshing result...</p> : null}
       {session.status === 'DRAFT' ? (
         <EmptyState title="No results yet" text="Open voting before result snapshots are computed." />
       ) : result ? (
@@ -574,19 +618,104 @@ function ResultsPanel({ session, result }: { session: DecisionSession; result: S
               <dd>{result.result_data.total_votes}</dd>
             </div>
           </dl>
-          <div className="rounds">
-            <h3>Rounds</h3>
-            {result.result_data.rounds.length === 0 ? <p className="muted">No round details yet.</p> : null}
-            {result.result_data.rounds.map((round, index) => (
-              <pre key={index}>{JSON.stringify(round, null, 2)}</pre>
-            ))}
-          </div>
+          <RoundBreakdown session={session} rounds={result.result_data.rounds} winningOptionId={result.winning_option_id} />
         </>
       ) : (
         <EmptyState title="Waiting for snapshot" text="The vote write is durable. The worker will publish the next result update." />
       )}
     </section>
   );
+}
+
+function RoundBreakdown({
+  session,
+  rounds,
+  winningOptionId,
+}: {
+  session: DecisionSession;
+  rounds: Array<Record<string, unknown>>;
+  winningOptionId: string | null;
+}) {
+  if (rounds.length === 0) {
+    return (
+      <div className="rounds">
+        <h3>Result breakdown</h3>
+        <p className="muted">No round details yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounds">
+      <h3>Result breakdown</h3>
+      {rounds.map((round, index) => (
+        <RoundCard key={index} session={session} round={round} index={index} winningOptionId={winningOptionId} />
+      ))}
+    </div>
+  );
+}
+
+function RoundCard({
+  session,
+  round,
+  index,
+  winningOptionId,
+}: {
+  session: DecisionSession;
+  round: Record<string, unknown>;
+  index: number;
+  winningOptionId: string | null;
+}) {
+  const counts = normalizeCounts(round.counts);
+  const maxVotes = Math.max(...counts.map((item) => item.votes), 0);
+  const winnerId = typeof round.winner_option_id === 'string' ? round.winner_option_id : winningOptionId;
+  const eliminatedId = typeof round.eliminated_option_id === 'string' ? round.eliminated_option_id : null;
+  const roundType = typeof round.type === 'string' ? round.type.replace('_', ' ') : session.voting_type.replace('_', ' ');
+
+  return (
+    <section className="round-card">
+      <div className="round-card-header">
+        <div>
+          <p className="eyebrow">Round {index + 1}</p>
+          <h4>{roundType}</h4>
+        </div>
+        {typeof round.active_ballots === 'number' ? <span className="pill">{round.active_ballots} active ballots</span> : null}
+      </div>
+      <div className="result-list">
+        {session.options.map((option) => {
+          const votes = counts.find((item) => item.optionId === option.id)?.votes ?? 0;
+          const width = maxVotes > 0 ? `${Math.max((votes / maxVotes) * 100, votes > 0 ? 6 : 0)}%` : '0%';
+
+          return (
+            <div key={option.id} className="result-row">
+              <div className="result-row-label">
+                <span>{option.title}</span>
+                <strong>{votes}</strong>
+              </div>
+              <div className="result-bar" aria-hidden="true">
+                <span style={{ width }} />
+              </div>
+              <div className="result-row-meta">
+                {winnerId === option.id ? <span className="pill success">Winner</span> : null}
+                {eliminatedId === option.id ? <span className="pill warning">Eliminated</span> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function normalizeCounts(value: unknown): Array<{ optionId: string; votes: number }> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  return Object.entries(value).map(([optionId, votes]) => ({
+    optionId,
+    votes: typeof votes === 'number' ? votes : Number(votes) || 0,
+  }));
 }
 
 function EmptyState({ title, text }: { title: string; text: string }) {
