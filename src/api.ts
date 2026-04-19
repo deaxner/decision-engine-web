@@ -1,4 +1,4 @@
-import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace, WorkspaceDashboard } from './types';
+import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace, WorkspaceDashboard, WorkspaceMember } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -43,6 +43,9 @@ export const api = {
   getWorkspaceDashboard(token: string, id: string) {
     return request<WorkspaceDashboard>(`/workspaces/${id}/dashboard`, {}, token);
   },
+  listMembers(token: string, workspaceId: string) {
+    return request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`, {}, token);
+  },
   addMember(token: string, workspaceId: string, email: string) {
     return request<{ workspace_id: string; user_id: string; role: 'MEMBER' }>(
       `/workspaces/${workspaceId}/members`,
@@ -53,7 +56,18 @@ export const api = {
   listSessions(token: string, workspaceId: string) {
     return request<DecisionSession[]>(`/workspaces/${workspaceId}/sessions`, {}, token);
   },
-  createSession(token: string, workspaceId: string, payload: { title: string; description?: string; voting_type: VotingType }) {
+  createSession(
+    token: string,
+    workspaceId: string,
+    payload: {
+      title: string;
+      description?: string;
+      voting_type: VotingType;
+      category?: string;
+      due_at?: string;
+      assignee_ids?: string[];
+    },
+  ) {
     return request<DecisionSession>(
       `/workspaces/${workspaceId}/sessions`,
       { method: 'POST', body: JSON.stringify(payload) },

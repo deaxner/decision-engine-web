@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DecisionSession, VotingType, Workspace, WorkspaceDashboard } from '../types';
+import type { DecisionSession, VotingType, Workspace, WorkspaceDashboard, WorkspaceMember } from '../types';
 import './sessions.css';
 
 function statusLabel(status: DecisionSession['status']) {
@@ -24,6 +24,51 @@ function relativeLabel(session: DecisionSession) {
     return 'Draft queue';
   }
   return 'Archived record';
+}
+
+export function dueLabel(value: string | null) {
+  if (!value) {
+    return 'No due date';
+  }
+
+  const now = new Date();
+  const dueAt = new Date(value);
+  if (Number.isNaN(dueAt.getTime())) {
+    return 'No due date';
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dueDay = new Date(dueAt.getFullYear(), dueAt.getMonth(), dueAt.getDate()).getTime();
+  const days = Math.ceil((dueDay - today) / 86_400_000);
+
+  if (days < 0) {
+    return 'Overdue';
+  }
+  if (days === 0) {
+    return 'Due today';
+  }
+  if (days === 1) {
+    return 'Due tomorrow';
+  }
+
+  return `Due in ${days} days`;
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+function dateInputToIso(value: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  return new Date(`${value}T12:00:00`).toISOString();
 }
 
 function boardGroups(items: DecisionSession[]) {
@@ -61,6 +106,8 @@ export function SessionBoard({
   dashboard,
   loadingDashboard,
   dashboardError,
+  members,
+  loadingMembers,
   createOpen,
   onCreateOpenChange,
   onSelect,
@@ -75,15 +122,20 @@ export function SessionBoard({
   dashboard: WorkspaceDashboard | null;
   loadingDashboard: boolean;
   dashboardError: string;
+  members: WorkspaceMember[];
+  loadingMembers: boolean;
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
   onSelect: (session: DecisionSession) => void;
   onSelectActivitySession: (sessionId: string) => void;
   onRetryDashboard: () => void;
-  onCreate: (payload: { title: string; description?: string; voting_type: VotingType }) => void;
+  onCreate: (payload: { title: string; description?: string; voting_type: VotingType; category?: string; due_at?: string; assignee_ids?: string[]; option_titles?: string[] }) => void;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [votingType, setVotingType] = useState<VotingType>('MAJORITY');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [step, setStep] = useState(1);
@@ -93,6 +145,9 @@ export function SessionBoard({
     if (!createOpen) {
       setTitle('');
       setDescription('');
+      setCategory('');
+      setDueAt('');
+      setAssigneeIds([]);
       setVotingType('MAJORITY');
       setOptions(['', '']);
       setStep(1);
@@ -114,7 +169,15 @@ export function SessionBoard({
   const activity = dashboard?.activity ?? [];
 
   function submitCreate() {
-    onCreate({ title, description: description || undefined, voting_type: votingType });
+    onCreate({
+      title,
+      description: description || undefined,
+      voting_type: votingType,
+      category: category.trim() || undefined,
+      due_at: dateInputToIso(dueAt),
+      assignee_ids: assigneeIds,
+      option_titles: optionValues,
+    });
     onCreateOpenChange(false);
   }
 
@@ -124,6 +187,10 @@ export function SessionBoard({
 
   function addOptionField() {
     setOptions((current) => [...current, '']);
+  }
+
+  function toggleAssignee(userId: string) {
+    setAssigneeIds((current) => (current.includes(userId) ? current.filter((item) => item !== userId) : [...current, userId]));
   }
 
   return (
@@ -200,14 +267,30 @@ export function SessionBoard({
                   <div className="decision-stream-header">
                     <div className="decision-stream-meta">
                       <span className={`status-pill status-pill-${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
-                      <span className="decision-stream-node">{methodLabel(item.voting_type)}</span>
+                      <span className="decision-stream-node">{item.category || 'No category'}</span>
                     </div>
+                    {(item.assignees ?? []).length > 0 ? (
+                      <div className="decision-avatar-stack" aria-label="Assigned stakeholders">
+                        {(item.assignees ?? []).slice(0, 3).map((assignee) => (
+                          <span key={assignee.id} title={assignee.display_name}>
+                            {initials(assignee.display_name)}
+                          </span>
+                        ))}
+                        {(item.assignees ?? []).length > 3 ? <span>+{(item.assignees ?? []).length - 3}</span> : null}
+                      </div>
+                    ) : null}
                   </div>
                   <h3>{item.title}</h3>
                   <p>{item.description ?? 'No strategic notes yet.'}</p>
                   <div className="decision-stream-footer">
                     <div>
                       <span className="decision-stream-foot-label">{item.options.length} options</span>
+                    </div>
+                    <div>
+                      <span className="decision-stream-foot-accent">{dueLabel(item.due_at ?? null)}</span>
+                    </div>
+                    <div>
+                      <span className="decision-stream-foot-label">{methodLabel(item.voting_type)}</span>
                     </div>
                     <div>
                       <span className="decision-stream-foot-accent">{relativeLabel(item)}</span>
@@ -358,6 +441,10 @@ export function SessionBoard({
                     <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Infrastructure migration roadmap 2026" required />
                   </label>
                   <label>
+                    Category / node
+                    <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Infrastructure" />
+                  </label>
+                  <label>
                     Strategic notes
                     <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Define the context and expected outcome" />
                   </label>
@@ -372,6 +459,10 @@ export function SessionBoard({
                       <option value="MAJORITY">Majority</option>
                       <option value="RANKED_IRV">Ranked IRV</option>
                     </select>
+                  </label>
+                  <label>
+                    Due date
+                    <input type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} />
                   </label>
                   <div className="composer-method-card" aria-live="polite">
                     <p className="small-heading">Voting profile</p>
@@ -408,6 +499,32 @@ export function SessionBoard({
                         ? `${optionValues.length} options will be available immediately in draft.`
                         : 'Add at least two options now, or continue editing after the draft is created.'}
                     </p>
+                  </div>
+                  <div className="assignee-picker">
+                    <div>
+                      <p className="small-heading">Assigned stakeholders</p>
+                      <p className="muted">{loadingMembers ? 'Loading workspace members...' : 'Select existing workspace members for required sign-off.'}</p>
+                    </div>
+                    {members.length > 0 ? (
+                      <div className="assignee-list">
+                        {members.map((member) => (
+                          <label key={member.id} className="assignee-choice">
+                            <input
+                              type="checkbox"
+                              checked={assigneeIds.includes(member.id)}
+                              onChange={() => toggleAssignee(member.id)}
+                            />
+                            <span className="assignee-avatar">{initials(member.display_name)}</span>
+                            <span>
+                              <strong>{member.display_name}</strong>
+                              <small>{member.email}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="inline-status">No workspace members are available for assignment yet.</p>
+                    )}
                   </div>
                 </div>
               ) : null}

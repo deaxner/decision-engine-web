@@ -2,7 +2,17 @@ import { OptionsPanel } from './OptionsPanel';
 import { VotePanel } from './VotePanel';
 import { ResultsPanel } from '../results/ResultsPanel';
 import type { DecisionSession, SessionResult } from '../types';
+import { dueLabel } from './SessionBoard';
 import './sessions.css';
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export function SessionDetail({
   session,
@@ -29,9 +39,23 @@ export function SessionDetail({
           <h1>{session.title}</h1>
           {session.description ? <p className="decision-description">{session.description}</p> : null}
           <div className="decision-meta-row">
+            <span className="decision-type-pill">{session.category || 'No category'}</span>
+            <span className={dueLabel(session.due_at ?? null) === 'Overdue' ? 'decision-type-pill decision-type-pill-warning' : 'decision-type-pill'}>
+              {dueLabel(session.due_at ?? null)}
+            </span>
             <span className="decision-type-pill">{session.voting_type === 'RANKED_IRV' ? 'Ranked IRV' : 'Majority vote'}</span>
             <span className="decision-type-pill">{session.status}</span>
           </div>
+          {(session.assignees ?? []).length > 0 ? (
+            <div className="decision-assignees" aria-label="Assigned stakeholders">
+              {(session.assignees ?? []).map((assignee) => (
+                <span key={assignee.id} className="decision-assignee-chip" title={assignee.email}>
+                  <strong>{initials(assignee.display_name)}</strong>
+                  {assignee.display_name}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </header>
         <div className="action-strip">
           <button className="primary-button" onClick={() => onStatus('OPEN')} disabled={!canOpen}>

@@ -31,7 +31,20 @@ describe('session flow', () => {
       if (url.endsWith('/workspaces/10/dashboard')) {
         return json(dashboardFor({ ...workspace, session_counts: { total: sessions.length, draft: sessions.filter((item) => item.status === 'DRAFT').length, open: sessions.filter((item) => item.status === 'OPEN').length, closed: sessions.filter((item) => item.status === 'CLOSED').length } }));
       }
+      if (url.endsWith('/workspaces/10/members')) {
+        return json([
+          { id: '1', email: 'owner@example.test', display_name: 'Owner', role: 'OWNER' },
+          { id: '2', email: 'member@example.test', display_name: 'Member User', role: 'MEMBER' },
+        ]);
+      }
       if (url.endsWith('/workspaces/10/sessions') && init?.method === 'POST') {
+        const body = JSON.parse(init.body as string);
+        currentSession = {
+          ...currentSession,
+          category: body.category,
+          due_at: body.due_at,
+          assignees: [{ id: '2', email: 'member@example.test', display_name: 'Member User' }],
+        };
         sessions = [currentSession];
         return json(currentSession, 201);
       }
@@ -59,15 +72,27 @@ describe('session flow', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Create decision' }));
     fireEvent.change(await screen.findByLabelText('Decision title'), { target: { value: 'Choose launch plan' } });
+    fireEvent.change(screen.getByLabelText('Category / node'), { target: { value: 'Product' } });
     fireEvent.change(screen.getByLabelText('Strategic notes'), { target: { value: 'Pick one' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'RANKED_IRV' } });
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2026-04-28' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.change(screen.getByLabelText('Option 1'), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText('Option 2'), { target: { value: 'B' } });
+    fireEvent.click(screen.getByLabelText(/Member User/i));
     fireEvent.click(screen.getAllByRole('button', { name: 'Create decision' })[1]);
     expect(await screen.findByText('Decision session created.')).toBeInTheDocument();
     expect(screen.getAllByText('Choose launch plan')).not.toHaveLength(0);
+    expect(screen.getAllByText('Product').length).toBeGreaterThan(1);
+    expect(screen.getByText('Member User')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/workspaces/10/sessions',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"category":"Product"'),
+      }),
+    );
 
     fireEvent.change(screen.getByLabelText('Option title'), { target: { value: 'A' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add option' }));

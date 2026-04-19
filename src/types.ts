@@ -27,6 +27,13 @@ export interface Workspace {
   };
 }
 
+export interface WorkspaceMember {
+  id: string;
+  email: string;
+  display_name: string;
+  role: 'OWNER' | 'MEMBER';
+}
+
 export interface WorkspaceDashboard {
   workspace: Workspace;
   metrics: {
@@ -70,12 +77,21 @@ export interface DecisionOption {
   position: number;
 }
 
+export interface DecisionAssignee {
+  id: string;
+  display_name: string;
+  email: string;
+}
+
 export interface DecisionSession {
   id: string;
   title: string;
   description: string | null;
   status: SessionStatus;
   voting_type: VotingType;
+  category?: string | null;
+  due_at?: string | null;
+  assignees?: DecisionAssignee[];
   starts_at: string | null;
   ends_at: string | null;
   options: DecisionOption[];

@@ -7,7 +7,7 @@ import { SessionDetail } from './sessions/SessionDetail';
 import { EmptyState } from './shared/EmptyState';
 import { StatusBar } from './shared/StatusBar';
 import { clearAuth, loadAuth, saveAuth } from './storage';
-import type { AuthState, DecisionSession, SessionResult, Workspace, WorkspaceDashboard } from './types';
+import type { AuthState, DecisionSession, SessionResult, Workspace, WorkspaceDashboard, WorkspaceMember } from './types';
 import { WorkspaceHeader } from './workspace/WorkspaceHeader';
 import { WorkspacePanel } from './workspace/WorkspacePanel';
 import { WorkspaceSettingsPanel } from './workspace/WorkspaceSettingsPanel';
@@ -51,8 +51,11 @@ export default function App() {
   const [result, setResult] = useState<SessionResult | null>(null);
   const [dashboard, setDashboard] = useState<WorkspaceDashboard | null>(null);
   const [sessionsByWorkspace, setSessionsByWorkspace] = useState<Record<string, DecisionSession[]>>({});
+  const [membersByWorkspace, setMembersByWorkspace] = useState<Record<string, WorkspaceMember[]>>({});
   const [resultsBySession, setResultsBySession] = useState<Record<string, SessionResult | null>>({});
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [dashboardError, setDashboardError] = useState('');
   const [loadingResult, setLoadingResult] = useState(false);
@@ -67,7 +70,7 @@ export default function App() {
   const searchResults = normalizedSearchQuery.length === 0
     ? []
     : sessions.filter((item) =>
-        `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type}`.toLowerCase().includes(normalizedSearchQuery),
+        `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type} ${item.category ?? ''} ${(item.assignees ?? []).map((assignee) => assignee.display_name).join(' ')}`.toLowerCase().includes(normalizedSearchQuery),
       );
   const openSessions = workspace?.session_counts.open ?? sessions.filter((item) => item.status === 'OPEN').length;
 
@@ -168,6 +171,26 @@ export default function App() {
     }
   }
 
+  async function refreshMembers(currentWorkspace = workspace) {
+    if (!currentWorkspace || !token) {
+      return;
+    }
+    setLoadingMembers(true);
+    try {
+      const members = await api.listMembers(token, currentWorkspace.id);
+      setMembersByWorkspace((cache) => ({ ...cache, [currentWorkspace.id]: members }));
+      if (activeWorkspaceId.current === currentWorkspace.id) {
+        setWorkspaceMembers(members);
+      }
+    } catch {
+      if (activeWorkspaceId.current === currentWorkspace.id) {
+        setWorkspaceMembers([]);
+      }
+    } finally {
+      setLoadingMembers(false);
+    }
+  }
+
   async function refreshSession(currentSession = session) {
     if (!currentSession || !token) {
       return;
@@ -203,6 +226,7 @@ export default function App() {
     activeWorkspaceId.current = workspace?.id ?? null;
     void run(refreshSessions);
     void refreshDashboard();
+    void refreshMembers();
   }, [workspace?.id]);
 
   useEffect(() => {
@@ -246,6 +270,8 @@ export default function App() {
     setSession(null);
     setResult(null);
     setDashboard(null);
+    setWorkspaceMembers([]);
+    setMembersByWorkspace({});
   }
 
   function selectWorkspaceById(workspaceId: string) {
@@ -257,6 +283,7 @@ export default function App() {
     activeSessionId.current = null;
     setWorkspace(next);
     setSessions(sessionsByWorkspace[next.id] ?? []);
+    setWorkspaceMembers(membersByWorkspace[next.id] ?? []);
     setSession(null);
     setResult(null);
     setDashboard(null);
@@ -424,6 +451,8 @@ export default function App() {
                   dashboard={dashboard}
                   loadingDashboard={loadingDashboard}
                   dashboardError={dashboardError}
+                  members={workspaceMembers}
+                  loadingMembers={loadingMembers}
                   createOpen={createDecisionOpen}
                   onCreateOpenChange={setCreateDecisionOpen}
                   onSelect={selectSession}
@@ -431,7 +460,14 @@ export default function App() {
                   onRetryDashboard={() => void refreshDashboard(workspace)}
                   onCreate={(payload) =>
                     run(async () => {
-                      const created = await api.createSession(token, workspace.id, payload);
+                      const { option_titles: optionTitles = [], ...sessionPayload } = payload;
+                      let created = await api.createSession(token, workspace.id, sessionPayload);
+                      for (const optionTitle of optionTitles) {
+                        await api.addOption(token, created.id, optionTitle);
+                      }
+                      if (optionTitles.length > 0) {
+                        created = await api.getSession(token, created.id);
+                      }
                       const nextSessions = [created, ...sessions];
                       setSessions(nextSessions);
                       setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
@@ -441,6 +477,7 @@ export default function App() {
                       setCreateDecisionOpen(false);
                       setCanvasMode('detail');
                       await refreshDashboard(workspace);
+                      await refreshMembers(workspace);
                       setNotice('Decision session created.');
                     })
                   }
@@ -492,6 +529,7 @@ export default function App() {
                       await api.addMember(token, workspace.id, email);
                       await refreshWorkspaces(auth, workspace.id);
                       await refreshDashboard(workspace);
+                      await refreshMembers(workspace);
                       setNotice('Member added.');
                     })
                   }
