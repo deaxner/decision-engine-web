@@ -41,7 +41,7 @@ export function AuthPanel({ onAuth, onError }: { onAuth: (auth: AuthState) => vo
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="name@company.com" required />
         </label>
         <label>
-          Security key
+          Password
           <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder=".........." required />
         </label>
         {mode === 'register' ? (

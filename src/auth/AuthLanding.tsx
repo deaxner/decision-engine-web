@@ -17,18 +17,19 @@ export function AuthLanding({
     <div className="auth-page">
       <nav className="auth-nav" aria-label="Decision Ledger">
         <strong>Decision Ledger</strong>
-        <div className="auth-nav-links" aria-label="Product sections">
-          <a href="#workspaces">Workspaces</a>
-          <a href="#insights">Insights</a>
-          <a href="#archive">Archive</a>
-          <a href="#security">Security</a>
-        </div>
       </nav>
 
       <section className="auth-hero">
         <div className="auth-copy">
           <p className="protocol-pill">Consensus system of record</p>
-          <h1>Make every decision visible, traceable, and defensible.</h1>
+          <h1 className="auth-hero-title">
+            <span>Make every decision</span>
+            <span className="rotating-word" aria-label="visible, traceable, and defensible">
+              <span>visible.</span>
+              <span>traceable.</span>
+              <span>defensible.</span>
+            </span>
+          </h1>
           <p className="auth-lede">
             Decision Ledger turns scattered opinions into structured sessions, live vote telemetry, and an audit-ready record your team can revisit without decoding chat history.
           </p>

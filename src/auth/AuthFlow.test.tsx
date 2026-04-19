@@ -23,10 +23,14 @@ describe('auth flow', () => {
     expect(screen.getAllByText('Decision Ledger').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Enter workspace' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Display name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Insights' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Archive' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Security' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /github/i })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Workspace email'), { target: { value: 'owner@example.test' } });
-    fireEvent.change(screen.getByLabelText('Security key'), { target: { value: 'secret-password' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enter workspace' }));
 
     expect(await screen.findByText('Workspace decisions')).toBeInTheDocument();
@@ -53,7 +57,7 @@ describe('auth flow', () => {
     expect(screen.queryByRole('button', { name: /github/i })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Workspace email'), { target: { value: 'owner@example.test' } });
-    fireEvent.change(screen.getByLabelText('Security key'), { target: { value: 'secret-password' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-password' } });
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Owner' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create ledger account' }));
 
