@@ -152,7 +152,12 @@ select:focus {
   background: #fffdfa;
   color: #27342d;
 }
-
+.subtitle{
+  font-size: 1.5rem;
+  color: var(--ledger-green-light);
+  font-family: var(--font-label);
+  font-weight: 700;
+}
 @media (max-width: 920px) {
   .app-shell {
     padding: 20px;

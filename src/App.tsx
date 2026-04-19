@@ -7,9 +7,10 @@ import { SessionDetail } from './sessions/SessionDetail';
 import { EmptyState } from './shared/EmptyState';
 import { StatusBar } from './shared/StatusBar';
 import { clearAuth, loadAuth, saveAuth } from './storage';
-import type { AuthState, DecisionSession, SessionResult, Workspace } from './types';
+import type { AuthState, DecisionSession, SessionResult, Workspace, WorkspaceDashboard } from './types';
 import { WorkspaceHeader } from './workspace/WorkspaceHeader';
 import { WorkspacePanel } from './workspace/WorkspacePanel';
+import { WorkspaceSettingsPanel } from './workspace/WorkspaceSettingsPanel';
 import './styles/base.css';
 import './styles/app-shell.css';
 
@@ -33,19 +34,27 @@ function summarizeSessions(items: DecisionSession[]) {
   );
 }
 
+type CanvasMode = 'board' | 'detail' | 'settings';
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(() => loadAuth());
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [createDecisionOpen, setCreateDecisionOpen] = useState(false);
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>('board');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [sessions, setSessions] = useState<DecisionSession[]>([]);
   const [session, setSession] = useState<DecisionSession | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
+  const [dashboard, setDashboard] = useState<WorkspaceDashboard | null>(null);
   const [sessionsByWorkspace, setSessionsByWorkspace] = useState<Record<string, DecisionSession[]>>({});
   const [resultsBySession, setResultsBySession] = useState<Record<string, SessionResult | null>>({});
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState('');
   const [loadingResult, setLoadingResult] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -60,9 +69,6 @@ export default function App() {
     : sessions.filter((item) =>
         `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type}`.toLowerCase().includes(normalizedSearchQuery),
       );
-  const visibleSessions = normalizedSearchQuery.length === 0
-    ? sessions
-    : searchResults;
   const openSessions = workspace?.session_counts.open ?? sessions.filter((item) => item.status === 'OPEN').length;
 
   async function run(action: () => Promise<void>) {
@@ -142,6 +148,26 @@ export default function App() {
     }
   }
 
+  async function refreshDashboard(currentWorkspace = workspace) {
+    if (!currentWorkspace || !token) {
+      return;
+    }
+    setLoadingDashboard(true);
+    setDashboardError('');
+    try {
+      const latest = await api.getWorkspaceDashboard(token, currentWorkspace.id);
+      if (activeWorkspaceId.current === currentWorkspace.id) {
+        setDashboard(latest);
+        setWorkspace(latest.workspace);
+        setWorkspaces((items) => items.map((item) => (item.id === latest.workspace.id ? latest.workspace : item)));
+      }
+    } catch (exception) {
+      setDashboardError(exception instanceof Error ? exception.message : 'Could not load dashboard.');
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }
+
   async function refreshSession(currentSession = session) {
     if (!currentSession || !token) {
       return;
@@ -176,6 +202,7 @@ export default function App() {
   useEffect(() => {
     activeWorkspaceId.current = workspace?.id ?? null;
     void run(refreshSessions);
+    void refreshDashboard();
   }, [workspace?.id]);
 
   useEffect(() => {
@@ -195,6 +222,7 @@ export default function App() {
         await refreshSession(session);
         await refreshResult(session);
         await refreshWorkspaces(auth, workspace?.id);
+        await refreshDashboard(workspace);
       });
     });
 
@@ -211,11 +239,13 @@ export default function App() {
   function signOut() {
     clearAuth();
     setAuth(null);
+    setCanvasMode('board');
     setWorkspaces([]);
     setWorkspace(null);
     setSessions([]);
     setSession(null);
     setResult(null);
+    setDashboard(null);
   }
 
   function selectWorkspaceById(workspaceId: string) {
@@ -229,7 +259,12 @@ export default function App() {
     setSessions(sessionsByWorkspace[next.id] ?? []);
     setSession(null);
     setResult(null);
+    setDashboard(null);
+    setDashboardError('');
+    setSearchQuery('');
+    setCanvasMode('board');
     setCreateDecisionOpen(false);
+    setCreateWorkspaceOpen(false);
   }
 
   function selectSession(next: DecisionSession) {
@@ -237,6 +272,21 @@ export default function App() {
     setSession(next);
     setResult(resultsBySession[next.id] ?? null);
     setSearchQuery('');
+    setCanvasMode('detail');
+  }
+
+  async function selectSessionById(sessionId: string) {
+    const cached = sessions.find((item) => item.id === sessionId);
+    if (cached) {
+      selectSession(cached);
+      return;
+    }
+
+    await run(async () => {
+      const next = await api.getSession(token, sessionId);
+      setSessions((items) => (items.some((item) => item.id === next.id) ? items : [next, ...items]));
+      selectSession(next);
+    });
   }
 
   if (!auth) {
@@ -330,25 +380,7 @@ export default function App() {
             workspaces={workspaces}
             active={workspace}
             onSelect={(next) => selectWorkspaceById(next.id)}
-            onCreate={(name) =>
-              run(async () => {
-                const created = await api.createWorkspace(token, { name, slug: slugify(name) || `workspace-${Date.now()}` });
-                setWorkspaces((items) => [...items, created]);
-                setWorkspace(created);
-                setNotice('Workspace created.');
-              })
-            }
-            onInvite={(email) =>
-              run(async () => {
-                if (!workspace) {
-                  return;
-                }
-                await api.addMember(token, workspace.id, email);
-                await refreshWorkspaces(auth, workspace.id);
-                setNotice('Member added.');
-              })
-            }
-            onOpenSettings={() => setNotice('Workspace settings is not available yet.')}
+            onCreateDecision={() => setCreateDecisionOpen(true)}
           />
         </div>
       </aside>
@@ -362,39 +394,59 @@ export default function App() {
                 <span>Workspaces</span>
                 <span>/</span>
                 <span>{workspace.name}</span>
-                {session ? (
+                {canvasMode === 'settings' ? (
+                  <>
+                    <span>/</span>
+                    <span>Settings</span>
+                  </>
+                ) : null}
+                {canvasMode === 'detail' && session ? (
                   <>
                     <span>/</span>
                     <span>{session.title}</span>
                   </>
                 ) : null}
               </div>
-              <WorkspaceHeader workspace={workspace} onCreateDecision={() => setCreateDecisionOpen(true)} />
-              <SessionBoard
-                sessions={visibleSessions}
-                totalSessions={sessions.length}
-                searchQuery={searchQuery}
+              <WorkspaceHeader
                 workspace={workspace}
-                active={session}
-                loading={loadingSessions}
-                createOpen={createDecisionOpen}
-                onCreateOpenChange={setCreateDecisionOpen}
-                onSelect={selectSession}
-                onCreate={(payload) =>
-                  run(async () => {
-                    const created = await api.createSession(token, workspace.id, payload);
-                    const nextSessions = [created, ...sessions];
-                    setSessions(nextSessions);
-                    setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
-                    updateWorkspaceSummary(workspace.id, nextSessions);
-                    setSession(created);
-                    setResult(null);
-                    setCreateDecisionOpen(false);
-                    setNotice('Decision session created.');
-                  })
-                }
+                mode={canvasMode}
+                onCreateDecision={() => setCreateDecisionOpen(true)}
+                onOpenSettings={() => setCanvasMode('settings')}
+                onOpenCreateWorkspace={() => setCreateWorkspaceOpen(true)}
+                onBackToBoard={() => setCanvasMode('board')}
               />
-              {session ? (
+              {canvasMode === 'board' ? (
+                <SessionBoard
+                  workspace={workspace}
+                  sessions={sessions}
+                  active={session}
+                  loading={loadingSessions}
+                  dashboard={dashboard}
+                  loadingDashboard={loadingDashboard}
+                  dashboardError={dashboardError}
+                  createOpen={createDecisionOpen}
+                  onCreateOpenChange={setCreateDecisionOpen}
+                  onSelect={selectSession}
+                  onSelectActivitySession={selectSessionById}
+                  onRetryDashboard={() => void refreshDashboard(workspace)}
+                  onCreate={(payload) =>
+                    run(async () => {
+                      const created = await api.createSession(token, workspace.id, payload);
+                      const nextSessions = [created, ...sessions];
+                      setSessions(nextSessions);
+                      setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
+                      updateWorkspaceSummary(workspace.id, nextSessions);
+                      setSession(created);
+                      setResult(null);
+                      setCreateDecisionOpen(false);
+                      setCanvasMode('detail');
+                      await refreshDashboard(workspace);
+                      setNotice('Decision session created.');
+                    })
+                  }
+                />
+              ) : null}
+              {canvasMode === 'detail' && session ? (
                 <SessionDetail
                   session={session}
                   result={result}
@@ -404,6 +456,7 @@ export default function App() {
                       await api.addOption(token, session.id, title);
                       await refreshSession(session);
                       await refreshSessions(workspace);
+                      await refreshDashboard(workspace);
                       setNotice('Option added.');
                     })
                   }
@@ -418,23 +471,97 @@ export default function App() {
                       });
                       await refreshSessions(workspace);
                       await refreshWorkspaces(auth, workspace.id);
+                      await refreshDashboard(workspace);
                       setNotice(status === 'OPEN' ? 'Voting opened.' : 'Session closed.');
                     })
                   }
                   onVote={(optionIds) =>
                     run(async () => {
                       await api.castVote(token, session, optionIds);
+                      await refreshDashboard(workspace);
                       setNotice('Vote accepted. Waiting for the result worker.');
                     })
                   }
-                  />
+                />
+              ) : null}
+              {canvasMode === 'settings' ? (
+                <WorkspaceSettingsPanel
+                  workspace={workspace}
+                  onInvite={(email) =>
+                    run(async () => {
+                      await api.addMember(token, workspace.id, email);
+                      await refreshWorkspaces(auth, workspace.id);
+                      await refreshDashboard(workspace);
+                      setNotice('Member added.');
+                    })
+                  }
+                />
               ) : null}
             </>
           ) : (
-            <EmptyState title="Create a workspace" text="Create the first workspace node to start capturing decisions, members, and live result snapshots." />
+            <section className="empty-state empty-state-action">
+              <EmptyState title="Create a workspace" text="Create the first workspace node to start capturing decisions, members, and live result snapshots." />
+              <button className="primary-button" type="button" onClick={() => setCreateWorkspaceOpen(true)}>
+                New workspace
+              </button>
+            </section>
           )}
         </div>
       </section>
+
+      {createWorkspaceOpen ? (
+        <div className="modal-overlay" role="presentation" onClick={() => setCreateWorkspaceOpen(false)}>
+          <section className="session-modal session-modal-compact" role="dialog" aria-modal="true" aria-labelledby="create-workspace-title" onClick={(event) => event.stopPropagation()}>
+            <div className="session-modal-header">
+              <div>
+                <p className="small-heading">Workspace</p>
+                <h2 id="create-workspace-title">Create a new workspace</h2>
+              </div>
+              <button className="icon-button session-modal-close" type="button" aria-label="Close create workspace modal" onClick={() => setCreateWorkspaceOpen(false)}>
+                x
+              </button>
+            </div>
+            <form
+              className="dashboard-session-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  const created = await api.createWorkspace(token, {
+                    name: newWorkspaceName,
+                    slug: slugify(newWorkspaceName) || `workspace-${Date.now()}`,
+                  });
+                  setWorkspaces((items) => [...items, created]);
+                  activeWorkspaceId.current = created.id;
+                  activeSessionId.current = null;
+                  setWorkspace(created);
+                  setSessions([]);
+                  setSession(null);
+                  setResult(null);
+                  setCanvasMode('board');
+                  setSearchQuery('');
+                  setNewWorkspaceName('');
+                  setCreateWorkspaceOpen(false);
+                  await refreshDashboard(created);
+                  setNotice('Workspace created.');
+                });
+              }}
+            >
+              <label>
+                Workspace name
+                <input value={newWorkspaceName} onChange={(event) => setNewWorkspaceName(event.target.value)} placeholder="Architecture Council" required />
+              </label>
+              <div className="dashboard-session-actions">
+                <button className="secondary-button" type="button" onClick={() => setCreateWorkspaceOpen(false)}>
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit">
+                  Create
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

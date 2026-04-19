@@ -1,13 +1,11 @@
 .toast-stack {
   position: fixed;
-  left: 50%;
+  right: 24px;
   bottom: 24px;
-  transform: translateX(-50%);
   z-index: 90;
   display: grid;
   gap: 10px;
   pointer-events: none;
-  justify-items: center;
 }
 
 .toast {
@@ -34,6 +32,12 @@
 
 .empty-state {
   padding: 36px 0;
+}
+
+.empty-state-action {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 
 .empty-state p {

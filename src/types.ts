@@ -27,6 +27,43 @@ export interface Workspace {
   };
 }
 
+export interface WorkspaceDashboard {
+  workspace: Workspace;
+  metrics: {
+    decision_speed_days: number | null;
+    engagement_rate: number;
+    active_session_count: number;
+    draft_session_count: number;
+    closed_session_count: number;
+  };
+  activity: WorkspaceActivityEvent[];
+  insights: WorkspaceInsight[];
+}
+
+export interface WorkspaceActivityEvent {
+  id: string;
+  type: string;
+  summary: string;
+  actor: {
+    id: string;
+    display_name: string;
+  } | null;
+  workspace_id: string;
+  session_id: string | null;
+  session_title: string | null;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface WorkspaceInsight {
+  id: string;
+  kind: string;
+  severity: 'info' | 'warning' | 'success';
+  title: string;
+  body: string;
+  session_id: string | null;
+}
+
 export interface DecisionOption {
   id: string;
   title: string;

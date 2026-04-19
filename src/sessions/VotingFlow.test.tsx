@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App';
 import type { DecisionSession } from '../types';
-import { installAppTestHooks, json, noContent, optionA, optionB, seedAuth, workspace } from '../test/appTestUtils';
+import { dashboardFor, installAppTestHooks, json, noContent, optionA, optionB, seedAuth, workspace } from '../test/appTestUtils';
 
 installAppTestHooks();
 
@@ -26,6 +26,9 @@ describe('voting flow', () => {
       }
       if (url.endsWith('/workspaces/10/sessions')) {
         return json([session]);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor({ ...workspace, session_counts: { total: 1, draft: 0, open: 1, closed: 0 } }));
       }
       if (url.endsWith('/sessions/20/results')) {
         return noContent();
@@ -72,6 +75,9 @@ describe('voting flow', () => {
       }
       if (url.endsWith('/workspaces/10/sessions')) {
         return json([session]);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor({ ...workspace, session_counts: { total: 1, draft: 0, open: 1, closed: 0 } }));
       }
       if (url.endsWith('/sessions/21/results')) {
         return noContent();

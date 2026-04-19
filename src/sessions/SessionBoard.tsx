@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DecisionSession, VotingType, Workspace } from '../types';
+import type { DecisionSession, VotingType, Workspace, WorkspaceDashboard } from '../types';
 import './sessions.css';
 
 function statusLabel(status: DecisionSession['status']) {
@@ -7,7 +7,7 @@ function statusLabel(status: DecisionSession['status']) {
     return 'Open';
   }
   if (status === 'CLOSED') {
-    return 'Closed';
+    return 'Archived';
   }
   return 'Draft';
 }
@@ -16,27 +16,70 @@ function methodLabel(votingType: VotingType) {
   return votingType === 'RANKED_IRV' ? 'Ranked IRV' : 'Majority';
 }
 
+function relativeLabel(session: DecisionSession) {
+  if (session.status === 'OPEN') {
+    return 'Voting open';
+  }
+  if (session.status === 'DRAFT') {
+    return 'Draft queue';
+  }
+  return 'Archived record';
+}
+
+function boardGroups(items: DecisionSession[]) {
+  return {
+    ACTIVE: items.filter((item) => item.status === 'OPEN'),
+    DRAFT: items.filter((item) => item.status === 'DRAFT'),
+    ARCHIVED: items.filter((item) => item.status === 'CLOSED'),
+  };
+}
+
+function formatDecisionSpeed(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return 'No history yet';
+  }
+
+  return `${value.toFixed(1)} Days`;
+}
+
+function formatActivityTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+type BoardView = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+
 export function SessionBoard({
-  sessions,
-  totalSessions,
-  searchQuery,
   workspace,
+  sessions,
   active,
   loading,
+  dashboard,
+  loadingDashboard,
+  dashboardError,
   createOpen,
   onCreateOpenChange,
   onSelect,
+  onSelectActivitySession,
+  onRetryDashboard,
   onCreate,
 }: {
-  sessions: DecisionSession[];
-  totalSessions: number;
-  searchQuery: string;
   workspace: Workspace;
+  sessions: DecisionSession[];
   active: DecisionSession | null;
   loading: boolean;
+  dashboard: WorkspaceDashboard | null;
+  loadingDashboard: boolean;
+  dashboardError: string;
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
   onSelect: (session: DecisionSession) => void;
+  onSelectActivitySession: (sessionId: string) => void;
+  onRetryDashboard: () => void;
   onCreate: (payload: { title: string; description?: string; voting_type: VotingType }) => void;
 }) {
   const [title, setTitle] = useState('');
@@ -44,11 +87,7 @@ export function SessionBoard({
   const [votingType, setVotingType] = useState<VotingType>('MAJORITY');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [step, setStep] = useState(1);
-  const [boardView, setBoardView] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
-  const activeCount = workspace.session_counts.open;
-  const draftCount = workspace.session_counts.draft;
-  const closedCount = workspace.session_counts.closed;
-  const filteredSessions = sessions.filter((item) => (boardView === 'ACTIVE' ? item.status !== 'CLOSED' : item.status === 'CLOSED'));
+  const [boardView, setBoardView] = useState<BoardView>('ACTIVE');
 
   useEffect(() => {
     if (!createOpen) {
@@ -60,7 +99,19 @@ export function SessionBoard({
     }
   }, [createOpen]);
 
+  useEffect(() => {
+    if (boardView === 'ACTIVE' && workspace.session_counts.open === 0 && workspace.session_counts.draft > 0) {
+      setBoardView('DRAFT');
+    }
+  }, [boardView, workspace.session_counts.draft, workspace.session_counts.open]);
+
   const optionValues = options.map((item) => item.trim()).filter(Boolean);
+  const grouped = boardGroups(sessions);
+  const visibleSessions = grouped[boardView];
+  const dashboardWorkspace = dashboard?.workspace ?? workspace;
+  const metrics = dashboard?.metrics;
+  const insights = dashboard?.insights ?? [];
+  const activity = dashboard?.activity ?? [];
 
   function submitCreate() {
     onCreate({ title, description: description || undefined, voting_type: votingType });
@@ -77,103 +128,173 @@ export function SessionBoard({
 
   return (
     <section className="workspace-dashboard">
-      <div className="dashboard-hero-grid">
-        <section className="dashboard-hero-panel dashboard-hero-panel-compact">
-          <div className="section-heading session-heading">
+      <section className="workspace-health">
+        <div className="workspace-health-header">
+          <div>
+            <p className="small-heading">Current workspace</p>
+            <h2>{dashboardWorkspace.name}</h2>
+          </div>
+          <div className="workspace-health-pill">
+            <span className="workspace-health-pill-dot" />
+            <span>
+              {dashboardWorkspace.session_counts.open} Active Session{dashboardWorkspace.session_counts.open === 1 ? '' : 's'}
+            </span>
+          </div>
+        </div>
+        {loadingDashboard ? <p className="inline-status">Loading dashboard analytics...</p> : null}
+        {dashboardError ? (
+          <div className="dashboard-error" role="status">
+            <span>{dashboardError}</span>
+            <button className="secondary-button" type="button" onClick={onRetryDashboard}>
+              Retry
+            </button>
+          </div>
+        ) : null}
+        <div className="workspace-health-grid">
+          <article className="health-card">
+            <span className="health-card-icon">CR</span>
             <div>
-              <p className="small-heading">Workspace overview</p>
-              <h2>Decision board</h2>
-            </div>
-            <p className="muted">Draft, open, and closed decisions stay visible in one board so the workspace state is immediately understandable.</p>
-          </div>
-          <div className="dashboard-overview-grid">
-            <article className="overview-card">
-              <span className="small-heading">Open now</span>
-              <strong>{activeCount}</strong>
-              <p>Sessions currently collecting live votes.</p>
-            </article>
-            <article className="overview-card">
-              <span className="small-heading">Draft queue</span>
-              <strong>{draftCount}</strong>
-              <p>Proposals still shaping options and framing.</p>
-            </article>
-            <article className="overview-card">
-              <span className="small-heading">Closed record</span>
-              <strong>{closedCount}</strong>
-              <p>Finalized decisions retained as accountable history.</p>
-            </article>
-          </div>
-        </section>
-        <aside className="dashboard-metrics">
-          <article className="dashboard-metric-card dashboard-metric-card-primary">
-            <p className="small-heading">Consensus reach</p>
-            <strong>{workspace.participation_rate}%</strong>
-            <span>{activeCount} active sessions are currently collecting votes.</span>
-          </article>
-          <article className="dashboard-metric-card">
-            <div className="dashboard-metric-row">
-              <h3>Active polls</h3>
-              <strong>{activeCount}</strong>
-            </div>
-            <div className="dashboard-chip-list">
-              <span>Drafts: {draftCount}</span>
-              <span>Closed: {closedCount}</span>
-              <span>Members: {workspace.member_count}</span>
+              <h3>{dashboardWorkspace.participation_rate}% Consensus Reach</h3>
+              <div className="health-progress">
+                <span style={{ width: `${Math.max(dashboardWorkspace.participation_rate, 8)}%` }} />
+              </div>
             </div>
           </article>
-        </aside>
-      </div>
+          <article className="health-card">
+            <span className="health-card-icon">DS</span>
+            <div>
+              <h3>Avg. Decision Speed</h3>
+              <p>{formatDecisionSpeed(metrics?.decision_speed_days)}</p>
+            </div>
+          </article>
+          <article className="health-card">
+            <span className="health-card-icon">ER</span>
+            <div>
+              <h3>Stakeholder Participation</h3>
+              <p>{metrics?.engagement_rate ?? 0}% Engagement</p>
+            </div>
+          </article>
+        </div>
+      </section>
 
-      <section className="session-band">
-        <div className="board-header">
-          <div className="section-heading board-heading-copy">
-            <div>
-              <p className="small-heading">Decision board</p>
-              <h2>Decision board</h2>
-            </div>
-            <p className="muted">Review active and archived decisions without stretching the page with inline creation forms.</p>
-          </div>
-          <div className="board-filter">
+      <section className="workspace-board-layout">
+        <div className="workspace-board-main">
+          <div className="decision-board-tabs" role="tablist" aria-label="Decision board views">
             <button className={boardView === 'ACTIVE' ? 'active' : ''} type="button" onClick={() => setBoardView('ACTIVE')}>
-              Active
+              Active Decisions
+            </button>
+            <button className={boardView === 'DRAFT' ? 'active' : ''} type="button" onClick={() => setBoardView('DRAFT')}>
+              Draft Items
             </button>
             <button className={boardView === 'ARCHIVED' ? 'active' : ''} type="button" onClick={() => setBoardView('ARCHIVED')}>
-              Archived
+              Archived Log
             </button>
           </div>
+
+          {loading ? <p className="inline-status">Refreshing sessions...</p> : null}
+
+          <div className="decision-stream">
+            {visibleSessions.length > 0 ? (
+              visibleSessions.map((item) => (
+                <button key={item.id} className={active?.id === item.id ? 'decision-stream-card active' : 'decision-stream-card'} type="button" onClick={() => onSelect(item)}>
+                  <div className="decision-stream-header">
+                    <div className="decision-stream-meta">
+                      <span className={`status-pill status-pill-${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
+                      <span className="decision-stream-node">{methodLabel(item.voting_type)}</span>
+                    </div>
+                  </div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description ?? 'No strategic notes yet.'}</p>
+                  <div className="decision-stream-footer">
+                    <div>
+                      <span className="decision-stream-foot-label">{item.options.length} options</span>
+                    </div>
+                    <div>
+                      <span className="decision-stream-foot-accent">{relativeLabel(item)}</span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <article className="decision-stream-card decision-stream-card-empty">
+                <h3>No decisions in this view</h3>
+                <p>
+                  {boardView === 'ACTIVE'
+                    ? 'Open decisions will appear here once voting begins.'
+                    : boardView === 'DRAFT'
+                      ? 'Draft decisions will appear here while teams shape options.'
+                      : 'Closed decisions stay here as the permanent log.'}
+                </p>
+              </article>
+            )}
+          </div>
         </div>
-        {loading ? <p className="inline-status">Refreshing sessions...</p> : null}
-        <div className="decision-board-grid" role="tablist" aria-label="Decision sessions">
-          {totalSessions === 0 ? (
-            <article className="decision-card decision-card-empty">
-              <h3>No decisions yet</h3>
-              <p>Create the first decision for this workspace to start building a visible decision record.</p>
-            </article>
-          ) : filteredSessions.length === 0 ? (
-            <article className="decision-card decision-card-empty">
-              <h3>No decisions in this view</h3>
-              <p>
-                {searchQuery.trim().length > 0
-                  ? `No ${boardView.toLowerCase()} decisions match "${searchQuery.trim()}".`
-                  : `There are no ${boardView.toLowerCase()} decisions in this workspace yet.`}
-              </p>
-            </article>
-          ) : (
-            filteredSessions.map((item) => (
-              <button key={item.id} className={active?.id === item.id ? 'decision-card active' : 'decision-card'} onClick={() => onSelect(item)}>
-                <div className="decision-card-header">
-                  <span className={`status-pill status-pill-${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
-                </div>
-                <h3>{item.title}</h3>
-                <p>{item.description ?? 'No strategic notes yet.'}</p>
-                <div className="decision-card-footer">
-                  <span>{methodLabel(item.voting_type)}</span>
-                  <span>{item.options.length} options</span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+
+        <aside className="workspace-side-rail">
+          <section className="workspace-side-section">
+            <h4>Recent Insights</h4>
+            <div className="insight-stack">
+              {insights.length > 0 ? (
+                insights.map((insight) => (
+                  <article key={insight.id} className={insight.severity === 'warning' ? 'insight-card insight-card-accent' : 'insight-card'}>
+                    <p>{insight.title}</p>
+                    <span>{insight.body}</span>
+                  </article>
+                ))
+              ) : (
+                <article className="insight-card">
+                  <p>No insights yet</p>
+                  <span>Rule-based insights will appear once there is enough workspace activity.</span>
+                </article>
+              )}
+            </div>
+          </section>
+
+          <section className="workspace-side-section">
+            <h4>Team Activity</h4>
+            <div className="activity-stack">
+              {activity.length > 0 ? (
+                activity.map((item) => {
+                  const initials =
+                    item.actor?.display_name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase())
+                      .join('') || 'DL';
+                  const content = (
+                    <>
+                      <div className="activity-avatar">{initials}</div>
+                      <div>
+                        <p>{item.summary}</p>
+                        <span>{formatActivityTime(item.created_at)}</span>
+                      </div>
+                    </>
+                  );
+
+                  return item.session_id ? (
+                    <button key={item.id} className="activity-row activity-row-button" type="button" onClick={() => onSelectActivitySession(item.session_id as string)}>
+                      {content}
+                    </button>
+                  ) : (
+                    <article key={item.id} className="activity-row">
+                      {content}
+                    </article>
+                  );
+                })
+              ) : (
+                <article className="insight-card">
+                  <p>No activity yet</p>
+                  <span>Workspace activity will appear once collaborators start drafting and voting.</span>
+                </article>
+              )}
+            </div>
+          </section>
+
+          <button className="workspace-side-button" type="button" onClick={onRetryDashboard}>
+            Refresh activity
+          </button>
+        </aside>
       </section>
 
       {createOpen ? (

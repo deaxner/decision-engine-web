@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App';
-import { installAppTestHooks, json, seedAuth, workspace } from '../test/appTestUtils';
+import { dashboardFor, installAppTestHooks, json, seedAuth, workspace } from '../test/appTestUtils';
 
 installAppTestHooks();
 
@@ -18,6 +18,9 @@ describe('workspace flow', () => {
       }
       if (url.endsWith('/workspaces/10/sessions')) {
         return json([]);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(workspace));
       }
       return json({ error: 'unexpected' }, 500);
     });
@@ -50,8 +53,14 @@ describe('workspace flow', () => {
       if (url.endsWith('/workspaces/10/sessions')) {
         return json([]);
       }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(workspace));
+      }
       if (url.endsWith('/workspaces/11/sessions')) {
         return json([]);
+      }
+      if (url.endsWith('/workspaces/11/dashboard')) {
+        return json(dashboardFor(secondWorkspace));
       }
       return json({ error: 'unexpected' }, 500);
     });
@@ -75,6 +84,9 @@ describe('workspace flow', () => {
       if (url.endsWith('/workspaces/10/sessions')) {
         return json([]);
       }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(workspace));
+      }
       return json({ error: 'unexpected' }, 500);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -84,5 +96,29 @@ describe('workspace flow', () => {
 
     expect(screen.getByRole('option', { name: 'Product' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Platform Council' })).toBeInTheDocument();
+  });
+
+  test('opens workspace settings as a separate surface', async () => {
+    seedAuth();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([workspace]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json([]);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(workspace));
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Workspace settings' }));
+
+    expect(await screen.findByText('Members and access')).toBeInTheDocument();
+    expect(screen.getByText('Add collaborator')).toBeInTheDocument();
   });
 });

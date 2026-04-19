@@ -1,4 +1,4 @@
-import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace } from './types';
+import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace, WorkspaceDashboard } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -39,6 +39,9 @@ export const api = {
   },
   getWorkspace(token: string, id: string) {
     return request<Workspace>(`/workspaces/${id}`, {}, token);
+  },
+  getWorkspaceDashboard(token: string, id: string) {
+    return request<WorkspaceDashboard>(`/workspaces/${id}/dashboard`, {}, token);
   },
   addMember(token: string, workspaceId: string, email: string) {
     return request<{ workspace_id: string; user_id: string; role: 'MEMBER' }>(

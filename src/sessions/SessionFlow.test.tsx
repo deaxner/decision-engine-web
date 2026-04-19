@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App';
 import type { DecisionSession } from '../types';
-import { installAppTestHooks, json, seedAuth, workspace } from '../test/appTestUtils';
+import { dashboardFor, installAppTestHooks, json, seedAuth, workspace } from '../test/appTestUtils';
 
 installAppTestHooks();
 
@@ -27,6 +27,9 @@ describe('session flow', () => {
       }
       if (url.endsWith('/workspaces/10/sessions') && !init?.method) {
         return json(sessions);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor({ ...workspace, session_counts: { total: sessions.length, draft: sessions.filter((item) => item.status === 'DRAFT').length, open: sessions.filter((item) => item.status === 'OPEN').length, closed: sessions.filter((item) => item.status === 'CLOSED').length } }));
       }
       if (url.endsWith('/workspaces/10/sessions') && init?.method === 'POST') {
         sessions = [currentSession];
@@ -77,7 +80,7 @@ describe('session flow', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20', expect.objectContaining({ method: 'PATCH' })));
   });
 
-  test('filters the decision board between active and archived sessions', async () => {
+  test('renders board tabs and opens detail on selection', async () => {
     seedAuth();
     const sessions: DecisionSession[] = [
       {
@@ -109,6 +112,43 @@ describe('session flow', () => {
       if (url.endsWith('/workspaces/10/sessions')) {
         return json(sessions);
       }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(
+          { ...workspace, participation_rate: 50, session_counts: { total: 2, draft: 0, open: 1, closed: 1 } },
+          {
+            metrics: {
+              decision_speed_days: 4.2,
+              engagement_rate: 50,
+              active_session_count: 1,
+              draft_session_count: 0,
+              closed_session_count: 1,
+            },
+            activity: [
+              {
+                id: '900',
+                type: 'voting_opened',
+                summary: 'Owner opened voting for Choose launch plan.',
+                actor: { id: '1', display_name: 'Owner' },
+                workspace_id: '10',
+                session_id: '20',
+                session_title: 'Choose launch plan',
+                created_at: '2026-04-19T19:42:00+00:00',
+                metadata: {},
+              },
+            ],
+            insights: [
+              {
+                id: 'decision-record-growing',
+                kind: 'archive',
+                severity: 'success',
+                title: 'Decision record is growing',
+                body: '1 closed decisions are retained as accountable history.',
+                session_id: null,
+              },
+            ],
+          },
+        ));
+      }
       return json({ error: 'unexpected' }, 500);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -116,12 +156,76 @@ describe('session flow', () => {
     render(<App />);
 
     expect(await screen.findByText('Choose launch plan')).toBeInTheDocument();
-    expect(screen.queryByText('Archive retention policy')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Active Decisions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Draft Items' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archived Log' })).toBeInTheDocument();
+    expect(screen.getByText('Recent Insights')).toBeInTheDocument();
+    expect(screen.getByText('4.2 Days')).toBeInTheDocument();
+    expect(screen.getByText('50% Engagement')).toBeInTheDocument();
+    expect(screen.getByText('Decision record is growing')).toBeInTheDocument();
+    expect(screen.getByText(/opened voting for Choose launch plan/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Node:/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Archived' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archived Log' }));
+    fireEvent.click(screen.getByRole('button', { name: /Archive retention policy/i }));
 
-    expect(await screen.findByText('Archive retention policy')).toBeInTheDocument();
-    expect(screen.queryByText('Choose launch plan')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Back to board' })).toBeInTheDocument();
+    expect(screen.getByText('Consensus monitor')).toBeInTheDocument();
+  });
+
+  test('dashboard activity can open a linked decision', async () => {
+    seedAuth();
+    const sessions: DecisionSession[] = [
+      {
+        id: '20',
+        title: 'Choose launch plan',
+        description: 'Pick one',
+        status: 'OPEN',
+        voting_type: 'MAJORITY',
+        starts_at: '2026-04-18T20:00:00+00:00',
+        ends_at: null,
+        options: [],
+      },
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([{ ...workspace, session_counts: { total: 1, draft: 0, open: 1, closed: 0 } }]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json(sessions);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(
+          { ...workspace, session_counts: { total: 1, draft: 0, open: 1, closed: 0 } },
+          {
+            activity: [
+              {
+                id: '900',
+                type: 'vote_cast',
+                summary: 'Owner cast a vote on Choose launch plan.',
+                actor: { id: '1', display_name: 'Owner' },
+                workspace_id: '10',
+                session_id: '20',
+                session_title: 'Choose launch plan',
+                created_at: '2026-04-19T19:42:00+00:00',
+                metadata: {},
+              },
+            ],
+          },
+        ));
+      }
+      if (url.endsWith('/sessions/20/results')) {
+        return json(null);
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /cast a vote on Choose launch plan/i }));
+    expect(await screen.findByText('Consensus monitor')).toBeInTheDocument();
   });
 
   test('search results can open a matching decision directly', async () => {
@@ -157,6 +261,9 @@ describe('session flow', () => {
       if (url.endsWith('/workspaces/10/sessions')) {
         return json(sessions);
       }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor({ ...workspace, participation_rate: 50, session_counts: { total: 2, draft: 0, open: 1, closed: 1 } }));
+      }
       if (url.endsWith('/sessions/21') && !init?.method) {
         return json(sessions[1]);
       }
@@ -178,7 +285,7 @@ describe('session flow', () => {
     render(<App />);
 
     fireEvent.change(await screen.findByLabelText('Search votes'), { target: { value: 'archive' } });
-    fireEvent.click(await screen.findByRole('button', { name: /Archive retention policy/i }));
+    fireEvent.click((await screen.findByRole('list', { name: 'Vote search results' })).querySelector('button') as HTMLButtonElement);
 
     expect(await screen.findAllByText('Archive retention policy')).not.toHaveLength(0);
     expect(await screen.findByText('Consensus monitor')).toBeInTheDocument();

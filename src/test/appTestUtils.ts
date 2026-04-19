@@ -1,6 +1,6 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
-import type { Workspace } from '../types';
+import type { Workspace, WorkspaceDashboard } from '../types';
 
 export const auth = {
   user: { id: '1', email: 'owner@example.test', display_name: 'Owner' },
@@ -24,6 +24,31 @@ export const workspace: Workspace = {
 
 export const optionA = { id: '100', title: 'A', position: 1 };
 export const optionB = { id: '101', title: 'B', position: 2 };
+
+export function dashboardFor(nextWorkspace: Workspace = workspace, overrides: Partial<WorkspaceDashboard> = {}): WorkspaceDashboard {
+  return {
+    workspace: nextWorkspace,
+    metrics: {
+      decision_speed_days: null,
+      engagement_rate: 0,
+      active_session_count: nextWorkspace.session_counts.open,
+      draft_session_count: nextWorkspace.session_counts.draft,
+      closed_session_count: nextWorkspace.session_counts.closed,
+    },
+    activity: [],
+    insights: [
+      {
+        id: 'no-active-sessions',
+        kind: 'activity',
+        severity: 'info',
+        title: 'No active voting sessions',
+        body: 'Open a draft when options are ready to start collecting votes.',
+        session_id: null,
+      },
+    ],
+    ...overrides,
+  };
+}
 
 export class MockEventSource extends EventTarget {
   static instances: MockEventSource[] = [];
