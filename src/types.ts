@@ -17,6 +17,14 @@ export interface Workspace {
   name: string;
   slug: string;
   role: 'OWNER' | 'MEMBER';
+  member_count: number;
+  participation_rate: number;
+  session_counts: {
+    total: number;
+    draft: number;
+    open: number;
+    closed: number;
+  };
 }
 
 export interface DecisionOption {

@@ -12,6 +12,14 @@ export const workspace: Workspace = {
   name: 'Product',
   slug: 'product',
   role: 'OWNER',
+  member_count: 1,
+  participation_rate: 0,
+  session_counts: {
+    total: 0,
+    draft: 0,
+    open: 0,
+    closed: 0,
+  },
 };
 
 export const optionA = { id: '100', title: 'A', position: 1 };

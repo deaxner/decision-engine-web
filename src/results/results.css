@@ -1,0 +1,149 @@
+.results-pane {
+  position: sticky;
+  top: 88px;
+  display: grid;
+  gap: 14px;
+  border-radius: 28px;
+  background: #f6f3f0;
+  padding: 28px;
+}
+
+.results-title {
+  margin-bottom: 0;
+  color: var(--ledger-green);
+  font-size: 1.4rem;
+}
+
+.results-copy {
+  margin-bottom: 0;
+  line-height: 1.55;
+}
+
+.rounds {
+  margin-top: 8px;
+}
+
+.round-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  border: 1px solid rgb(113 121 118 / 12%);
+  border-radius: 18px;
+  background: white;
+  padding: 16px;
+}
+
+.round-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.round-card h4 {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid #c7bfb2;
+  border-radius: 999px;
+  background: #f5f2ec;
+  color: #34423b;
+  padding: 3px 9px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.pill.success {
+  border-color: #8ab99d;
+  background: #e2f3e9;
+  color: #1d5e38;
+}
+
+.pill.warning {
+  border-color: #d7b46f;
+  background: #fff4d6;
+  color: #79530f;
+}
+
+.result-list {
+  display: grid;
+  gap: 12px;
+}
+
+.result-row {
+  display: grid;
+  gap: 7px;
+}
+
+.result-row-label,
+.result-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.result-row-label strong {
+  font-size: 1rem;
+}
+
+.result-row-meta:empty {
+  display: none;
+}
+
+.result-bar {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: #ebe4d9;
+}
+
+.result-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #184834, #67a27f);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 6px 0 10px;
+}
+
+.metric-grid div {
+  border-radius: 16px;
+  background: white;
+  padding: 14px;
+}
+
+.metric-grid dt {
+  color: #65706a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metric-grid dd {
+  margin: 6px 0 0;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+@media (max-width: 1100px) {
+  .results-pane {
+    position: static;
+  }
+}
+
+@media (max-width: 920px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+}

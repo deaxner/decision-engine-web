@@ -6,10 +6,18 @@ export function OptionsPanel({ session, onAddOption }: { session: DecisionSessio
 
   return (
     <section className="options-panel">
-      <h3>Options</h3>
+      <div className="panel-section-heading">
+        <h3>Proposed options</h3>
+        <span className="decision-type-pill">{session.status === 'DRAFT' ? 'Draft phase' : 'Voting live'}</span>
+      </div>
       <ol className="option-list">
         {session.options.map((option) => (
-          <li key={option.id}>{option.title}</li>
+          <li key={option.id} className="option-card">
+            <span className="option-marker" aria-hidden="true" />
+            <div>
+              <strong>{option.title}</strong>
+            </div>
+          </li>
         ))}
       </ol>
       {session.status === 'DRAFT' ? (

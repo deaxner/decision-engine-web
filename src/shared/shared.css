@@ -1,0 +1,22 @@
+.status-bar {
+  margin: 18px 0;
+  padding: 12px 14px;
+  border: 1px solid #9dcab2;
+  border-radius: 8px;
+  background: #e9f7ef;
+  color: #1d5e38;
+}
+
+.status-bar.error {
+  border-color: #e6a6a0;
+  background: #fff0ee;
+  color: #963227;
+}
+
+.empty-state {
+  padding: 36px 0;
+}
+
+.empty-state p {
+  color: #65706a;
+}

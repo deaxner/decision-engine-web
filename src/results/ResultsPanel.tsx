@@ -1,6 +1,7 @@
 import { EmptyState } from '../shared/EmptyState';
 import { RoundBreakdown } from './RoundBreakdown';
 import type { DecisionSession, SessionResult } from '../types';
+import './results.css';
 
 export function ResultsPanel({ session, result, loading }: { session: DecisionSession; result: SessionResult | null; loading: boolean }) {
   const winner = session.options.find((option) => option.id === result?.winning_option_id);
@@ -8,6 +9,8 @@ export function ResultsPanel({ session, result, loading }: { session: DecisionSe
   return (
     <section className="results-pane" aria-label="Results">
       <p className="eyebrow">Live results</p>
+      <h3 className="results-title">Consensus monitor</h3>
+      <p className="muted results-copy">Result snapshots update after durable vote writes and worker recomputation.</p>
       {loading ? <p className="inline-status">Refreshing result...</p> : null}
       {session.status === 'DRAFT' ? (
         <EmptyState title="No results yet" text="Open voting before result snapshots are computed." />

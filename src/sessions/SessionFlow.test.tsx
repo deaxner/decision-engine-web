@@ -55,9 +55,11 @@ describe('session flow', () => {
 
     render(<App />);
     fireEvent.change(await screen.findByLabelText('Decision title'), { target: { value: 'Choose launch plan' } });
-    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Pick one' } });
+    fireEvent.change(screen.getByLabelText('Strategic notes'), { target: { value: 'Pick one' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'RANKED_IRV' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose decision' }));
     expect(await screen.findByText('Decision session created.')).toBeInTheDocument();
     expect(screen.getAllByText('Choose launch plan')).not.toHaveLength(0);
 
@@ -70,5 +72,52 @@ describe('session flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open voting' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20', expect.objectContaining({ method: 'PATCH' })));
+  });
+
+  test('filters the decision board between active and archived sessions', async () => {
+    seedAuth();
+    const sessions: DecisionSession[] = [
+      {
+        id: '20',
+        title: 'Choose launch plan',
+        description: 'Pick one',
+        status: 'OPEN',
+        voting_type: 'MAJORITY',
+        starts_at: '2026-04-18T20:00:00+00:00',
+        ends_at: null,
+        options: [],
+      },
+      {
+        id: '21',
+        title: 'Archive retention policy',
+        description: 'Historic governance choice',
+        status: 'CLOSED',
+        voting_type: 'RANKED_IRV',
+        starts_at: '2026-04-17T20:00:00+00:00',
+        ends_at: '2026-04-18T20:00:00+00:00',
+        options: [],
+      },
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([{ ...workspace, participation_rate: 50, session_counts: { total: 2, draft: 0, open: 1, closed: 1 } }]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json(sessions);
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText('Choose launch plan')).toBeInTheDocument();
+    expect(screen.queryByText('Archive retention policy')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archived' }));
+
+    expect(await screen.findByText('Archive retention policy')).toBeInTheDocument();
+    expect(screen.queryByText('Choose launch plan')).not.toBeInTheDocument();
   });
 });

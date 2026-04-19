@@ -1,3 +1,5 @@
+import './shared.css';
+
 export function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <section className="empty-state">

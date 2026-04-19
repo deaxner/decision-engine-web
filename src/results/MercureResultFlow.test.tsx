@@ -55,7 +55,8 @@ describe('Mercure result flow', () => {
 
     MockEventSource.instances[0].dispatchEvent(new MessageEvent('result_updated'));
 
-    expect(await screen.findByText('3')).toBeInTheDocument();
+    const votesMetric = await screen.findByText('Votes');
+    expect(votesMetric.closest('div')).toHaveTextContent('3');
     expect(screen.getByText('Result breakdown')).toBeInTheDocument();
     expect(screen.getAllByText('A').length).toBeGreaterThan(1);
     expect(screen.getAllByText('B').length).toBeGreaterThan(1);

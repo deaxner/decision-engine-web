@@ -2,6 +2,13 @@
 
 Frontend client for the real-time decision platform.
 
+## License Status
+
+This repository is source-available for viewing and evaluation only.
+All rights are reserved by the author. No permission is granted to use,
+modify, redistribute, or commercialize this code without prior written
+permission. See [LICENSE](LICENSE).
+
 This repository owns the user-facing workspace, session, voting, and result views. It consumes the API and subscribes to Mercure topics for live result updates.
 
 ## Responsibilities

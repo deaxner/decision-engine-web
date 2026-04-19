@@ -1,6 +1,7 @@
 import { AuthPanel } from './AuthPanel';
 import { StatusBar } from '../shared/StatusBar';
 import type { AuthState } from '../types';
+import './auth.css';
 
 export function AuthLanding({
   notice,

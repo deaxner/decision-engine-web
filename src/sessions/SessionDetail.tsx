@@ -2,6 +2,7 @@ import { OptionsPanel } from './OptionsPanel';
 import { VotePanel } from './VotePanel';
 import { ResultsPanel } from '../results/ResultsPanel';
 import type { DecisionSession, SessionResult } from '../types';
+import './sessions.css';
 
 export function SessionDetail({
   session,
@@ -23,11 +24,17 @@ export function SessionDetail({
   return (
     <section className="detail-grid">
       <div className="decision-pane">
-        <p className="eyebrow">{session.voting_type}</p>
-        <h2>{session.title}</h2>
-        {session.description ? <p className="muted">{session.description}</p> : null}
+        <header className="decision-header">
+          <p className="eyebrow">Decision protocol</p>
+          <h1>{session.title}</h1>
+          {session.description ? <p className="decision-description">{session.description}</p> : null}
+          <div className="decision-meta-row">
+            <span className="decision-type-pill">{session.voting_type === 'RANKED_IRV' ? 'Ranked IRV' : 'Majority vote'}</span>
+            <span className="decision-type-pill">{session.status}</span>
+          </div>
+        </header>
         <div className="action-strip">
-          <button className="secondary-button" onClick={() => onStatus('OPEN')} disabled={!canOpen}>
+          <button className="primary-button" onClick={() => onStatus('OPEN')} disabled={!canOpen}>
             Open voting
           </button>
           <button className="secondary-button" onClick={() => onStatus('CLOSED')} disabled={session.status !== 'OPEN'}>

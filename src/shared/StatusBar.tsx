@@ -1,3 +1,5 @@
+import './shared.css';
+
 export function StatusBar({ notice, error }: { notice: string; error: string }) {
   if (!notice && !error) {
     return null;

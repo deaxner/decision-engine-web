@@ -10,12 +10,33 @@ import { clearAuth, loadAuth, saveAuth } from './storage';
 import type { AuthState, DecisionSession, SessionResult, Workspace } from './types';
 import { WorkspaceHeader } from './workspace/WorkspaceHeader';
 import { WorkspacePanel } from './workspace/WorkspacePanel';
-import './styles.css';
+import './styles/base.css';
+import './styles/app-shell.css';
 
 const MERCURE_URL = import.meta.env.VITE_MERCURE_URL ?? 'http://127.0.0.1:3001/.well-known/mercure';
 
+function summarizeSessions(items: DecisionSession[]) {
+  return items.reduce(
+    (summary, item) => {
+      summary.total += 1;
+      if (item.status === 'DRAFT') {
+        summary.draft += 1;
+      } else if (item.status === 'OPEN') {
+        summary.open += 1;
+      } else {
+        summary.closed += 1;
+      }
+
+      return summary;
+    },
+    { total: 0, draft: 0, open: 0, closed: 0 },
+  );
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(() => loadAuth());
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [sessions, setSessions] = useState<DecisionSession[]>([]);
@@ -31,6 +52,15 @@ export default function App() {
   const activeSessionId = useRef<string | null>(null);
 
   const token = auth?.token ?? '';
+  const visibleWorkspaces = searchQuery.trim().length === 0
+    ? workspaces
+    : workspaces.filter((item) => `${item.name} ${item.slug}`.toLowerCase().includes(searchQuery.trim().toLowerCase()));
+  const visibleSessions = searchQuery.trim().length === 0
+    ? sessions
+    : sessions.filter((item) =>
+        `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type}`.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      );
+  const openSessions = workspace?.session_counts.open ?? sessions.filter((item) => item.status === 'OPEN').length;
 
   async function run(action: () => Promise<void>) {
     setError('');
@@ -41,15 +71,23 @@ export default function App() {
     }
   }
 
-  async function refreshWorkspaces(nextAuth = auth) {
+  function updateWorkspaceSummary(workspaceId: string, items: DecisionSession[]) {
+    const sessionCounts = summarizeSessions(items);
+    setWorkspaces((current) =>
+      current.map((item) => (item.id === workspaceId ? { ...item, session_counts: sessionCounts } : item)),
+    );
+    setWorkspace((current) => (current && current.id === workspaceId ? { ...current, session_counts: sessionCounts } : current));
+  }
+
+  async function refreshWorkspaces(nextAuth = auth, preferredWorkspaceId?: string | null) {
     if (!nextAuth) {
       return;
     }
     const items = await api.listWorkspaces(nextAuth.token);
     setWorkspaces(items);
-    if (!workspace && items.length > 0) {
-      setWorkspace(items[0]);
-    }
+    const nextWorkspaceId = preferredWorkspaceId ?? activeWorkspaceId.current ?? workspace?.id ?? null;
+    const nextWorkspace = items.find((item) => item.id === nextWorkspaceId) ?? items[0] ?? null;
+    setWorkspace(nextWorkspace);
   }
 
   async function refreshSessions(currentWorkspace = workspace) {
@@ -60,6 +98,7 @@ export default function App() {
     try {
       const items = await api.listSessions(token, currentWorkspace.id);
       setSessionsByWorkspace((cache) => ({ ...cache, [currentWorkspace.id]: items }));
+      updateWorkspaceSummary(currentWorkspace.id, items);
       if (activeWorkspaceId.current === currentWorkspace.id) {
         setSessions(items);
         setSession((current) => (current ? items.find((item) => item.id === current.id) ?? current : current));
@@ -121,6 +160,7 @@ export default function App() {
       void run(async () => {
         await refreshSession(session);
         await refreshResult(session);
+        await refreshWorkspaces(auth, workspace?.id);
       });
     });
 
@@ -144,6 +184,19 @@ export default function App() {
     setResult(null);
   }
 
+  function selectWorkspaceById(workspaceId: string) {
+    const next = workspaces.find((item) => item.id === workspaceId);
+    if (!next) {
+      return;
+    }
+    activeWorkspaceId.current = next.id;
+    activeSessionId.current = null;
+    setWorkspace(next);
+    setSessions(sessionsByWorkspace[next.id] ?? []);
+    setSession(null);
+    setResult(null);
+  }
+
   if (!auth) {
     return (
       <main className="app-shell auth-shell">
@@ -153,35 +206,69 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Decision Engine</p>
-          <h1>Workspace decisions</h1>
+    <main className={railCollapsed ? 'app-shell app-shell-auth rail-collapsed' : 'app-shell app-shell-auth'}>
+      <header className="oracle-topbar">
+        <div className="oracle-brand">
+          <button
+            className="icon-button rail-toggle"
+            aria-label={railCollapsed ? 'Expand workspace rail' : 'Collapse workspace rail'}
+            onClick={() => setRailCollapsed((current) => !current)}
+            type="button"
+          >
+            {railCollapsed ? '>' : '<'}
+          </button>
+          <strong>Decision Ledger</strong>
+          <div className="oracle-search">
+            <input
+              aria-label="Search insights"
+              placeholder="Search insights..."
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </div>
         </div>
-        <div className="user-strip">
-          <span>{auth.user.display_name}</span>
+        <nav className="oracle-nav" aria-label="Primary">
+          <a href="#workspaces" className="active">
+            Workspaces
+          </a>
+          <a href="#insights">Insights</a>
+          <a href="#archive">Archive</a>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div className="oracle-actions">
+          <button className="icon-button" aria-label="Notifications" type="button">
+            N
+          </button>
+          <button className="icon-button" aria-label="Help" type="button">
+            ?
+          </button>
+          <div className="profile-chip" aria-label={`Signed in as ${auth.user.display_name}`}>
+            {auth.user.display_name.slice(0, 1).toUpperCase()}
+          </div>
           <button className="ghost-button" onClick={signOut}>
             Sign out
           </button>
         </div>
       </header>
-
-      <StatusBar notice={notice} error={error} />
-
-      <section className="workspace-layout">
-        <aside className="sidebar">
+      <aside className={railCollapsed ? 'workspace-rail collapsed' : 'workspace-rail'}>
+        <div className="rail-header">
+          <div className="rail-badge">DL</div>
+          <div>
+            <h2>Workspaces</h2>
+            <p className="small-heading">Active nodes</p>
+          </div>
+        </div>
+        <div className="rail-meta">
+          <span>{workspaces.length} total</span>
+          <span>{openSessions} open sessions</span>
+        </div>
+        <div className="rail-panel">
           <WorkspacePanel
-            workspaces={workspaces}
+            collapsed={railCollapsed}
+            workspaces={visibleWorkspaces}
             active={workspace}
-            onSelect={(next) => {
-              activeWorkspaceId.current = next.id;
-              activeSessionId.current = null;
-              setWorkspace(next);
-              setSessions(sessionsByWorkspace[next.id] ?? []);
-              setSession(null);
-              setResult(null);
-            }}
+            onSelect={(next) => selectWorkspaceById(next.id)}
             onCreate={(name) =>
               run(async () => {
                 const created = await api.createWorkspace(token, { name, slug: slugify(name) || `workspace-${Date.now()}` });
@@ -191,22 +278,42 @@ export default function App() {
               })
             }
           />
-        </aside>
+        </div>
+      </aside>
 
-        <section className="content-column">
+      <section className="app-canvas">
+        <div className="canvas-shell">
+          <StatusBar notice={notice} error={error} />
           {workspace ? (
             <>
+              <div className="breadcrumb-trail" aria-label="Breadcrumb">
+                <span>Workspaces</span>
+                <span>/</span>
+                <span>{workspace.name}</span>
+                {session ? (
+                  <>
+                    <span>/</span>
+                    <span>{session.title}</span>
+                  </>
+                ) : null}
+              </div>
               <WorkspaceHeader
                 workspace={workspace}
+                workspaces={workspaces}
+                onSelectWorkspace={selectWorkspaceById}
                 onInvite={(email) =>
                   run(async () => {
                     await api.addMember(token, workspace.id, email);
+                    await refreshWorkspaces(auth, workspace.id);
                     setNotice('Member added.');
                   })
                 }
               />
               <SessionBoard
-                sessions={sessions}
+                sessions={visibleSessions}
+                totalSessions={sessions.length}
+                searchQuery={searchQuery}
+                workspace={workspace}
                 active={session}
                 loading={loadingSessions}
                 onSelect={(next) => {
@@ -220,6 +327,7 @@ export default function App() {
                     const nextSessions = [created, ...sessions];
                     setSessions(nextSessions);
                     setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
+                    updateWorkspaceSummary(workspace.id, nextSessions);
                     setSession(created);
                     setResult(null);
                     setNotice('Decision session created.');
@@ -243,8 +351,13 @@ export default function App() {
                     run(async () => {
                       const updated = await api.updateSessionStatus(token, session.id, status);
                       setSession(updated);
-                      setSessions((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+                      setSessions((items) => {
+                        const nextSessions = items.map((item) => (item.id === updated.id ? updated : item));
+                        updateWorkspaceSummary(workspace.id, nextSessions);
+                        return nextSessions;
+                      });
                       await refreshSessions(workspace);
+                      await refreshWorkspaces(auth, workspace.id);
                       setNotice(status === 'OPEN' ? 'Voting opened.' : 'Session closed.');
                     })
                   }
@@ -254,15 +367,13 @@ export default function App() {
                       setNotice('Vote accepted. Waiting for the result worker.');
                     })
                   }
-                />
-              ) : (
-                <EmptyState title="Select or create a session" text="Draft decisions, open them for voting, then watch result snapshots update." />
-              )}
+                  />
+              ) : null}
             </>
           ) : (
-            <EmptyState title="Create a workspace" text="Workspaces isolate members, decisions, votes, and result streams." />
+            <EmptyState title="Create a workspace" text="Create the first workspace node to start capturing decisions, members, and live result snapshots." />
           )}
-        </section>
+        </div>
       </section>
     </main>
   );
