@@ -123,4 +123,64 @@ describe('session flow', () => {
     expect(await screen.findByText('Archive retention policy')).toBeInTheDocument();
     expect(screen.queryByText('Choose launch plan')).not.toBeInTheDocument();
   });
+
+  test('search results can open a matching decision directly', async () => {
+    seedAuth();
+    const sessions: DecisionSession[] = [
+      {
+        id: '20',
+        title: 'Choose launch plan',
+        description: 'Pick one',
+        status: 'OPEN',
+        voting_type: 'MAJORITY',
+        starts_at: '2026-04-18T20:00:00+00:00',
+        ends_at: null,
+        options: [{ id: '10', title: 'Option A', position: 1 }],
+      },
+      {
+        id: '21',
+        title: 'Archive retention policy',
+        description: 'Historic governance choice',
+        status: 'CLOSED',
+        voting_type: 'RANKED_IRV',
+        starts_at: '2026-04-17T20:00:00+00:00',
+        ends_at: '2026-04-18T20:00:00+00:00',
+        options: [{ id: '11', title: 'Keep 1 year', position: 1 }],
+      },
+    ];
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([{ ...workspace, participation_rate: 50, session_counts: { total: 2, draft: 0, open: 1, closed: 1 } }]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json(sessions);
+      }
+      if (url.endsWith('/sessions/21') && !init?.method) {
+        return json(sessions[1]);
+      }
+      if (url.endsWith('/sessions/21/result')) {
+        return json({
+          session_id: '21',
+          version: 1,
+          winning_option_id: '11',
+          result_data: {
+            total_votes: 1,
+            rounds: [{ type: 'MAJORITY', counts: { 11: 1 } }],
+          },
+        });
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText('Search votes'), { target: { value: 'archive' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Archive retention policy/i }));
+
+    expect(await screen.findAllByText('Archive retention policy')).not.toHaveLength(0);
+    expect(await screen.findByText('Consensus monitor')).toBeInTheDocument();
+  });
 });

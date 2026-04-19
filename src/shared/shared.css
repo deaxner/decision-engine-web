@@ -1,11 +1,13 @@
 .toast-stack {
   position: fixed;
-  top: 84px;
-  right: 24px;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
   z-index: 90;
   display: grid;
   gap: 10px;
   pointer-events: none;
+  justify-items: center;
 }
 
 .toast {

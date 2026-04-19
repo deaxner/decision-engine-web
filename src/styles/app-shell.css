@@ -44,6 +44,7 @@
 }
 
 .oracle-search {
+  position: relative;
   display: flex;
   align-items: center;
   min-width: 240px;
@@ -62,6 +63,83 @@
 
 .oracle-search input:focus {
   outline: 0;
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: min(420px, 90vw);
+  margin: 0;
+  padding: 8px;
+  border: 1px solid rgb(113 121 118 / 14%);
+  border-radius: 18px;
+  background: rgb(252 249 246 / 98%);
+  box-shadow: 0 18px 40px rgb(28 28 26 / 12%);
+  list-style: none;
+}
+
+.search-result-button {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 12px;
+  text-align: left;
+}
+
+.search-result-button:hover {
+  background: #f1eeea;
+}
+
+.search-result-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.search-result-copy strong {
+  color: #18352f;
+  font-size: 0.95rem;
+}
+
+.search-result-copy small {
+  color: #66716d;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.search-result-status {
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.search-result-status-open {
+  background: #f3e2ac;
+  color: #5e4c14;
+}
+
+.search-result-status-draft {
+  background: #ece6da;
+  color: #6f6147;
+}
+
+.search-result-status-closed {
+  background: #dcebe6;
+  color: #234d40;
+}
+
+.search-results-empty {
+  padding: 12px;
+  color: #66716d;
+  font-size: 0.82rem;
 }
 
 .oracle-nav {

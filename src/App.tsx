@@ -51,13 +51,18 @@ export default function App() {
   const [error, setError] = useState('');
   const activeWorkspaceId = useRef<string | null>(null);
   const activeSessionId = useRef<string | null>(null);
+  const searchRef = useRef<HTMLDivElement | null>(null);
 
   const token = auth?.token ?? '';
-  const visibleSessions = searchQuery.trim().length === 0
-    ? sessions
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const searchResults = normalizedSearchQuery.length === 0
+    ? []
     : sessions.filter((item) =>
-        `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type}`.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+        `${item.title} ${item.description ?? ''} ${item.status} ${item.voting_type}`.toLowerCase().includes(normalizedSearchQuery),
       );
+  const visibleSessions = normalizedSearchQuery.length === 0
+    ? sessions
+    : searchResults;
   const openSessions = workspace?.session_counts.open ?? sessions.filter((item) => item.status === 'OPEN').length;
 
   async function run(action: () => Promise<void>) {
@@ -84,6 +89,21 @@ export default function App() {
     const timeout = window.setTimeout(() => setError(''), 4200);
     return () => window.clearTimeout(timeout);
   }, [error]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!searchRef.current?.contains(event.target as Node)) {
+        setSearchQuery('');
+      }
+    }
+
+    if (!normalizedSearchQuery) {
+      return;
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, [normalizedSearchQuery]);
 
   function updateWorkspaceSummary(workspaceId: string, items: DecisionSession[]) {
     const sessionCounts = summarizeSessions(items);
@@ -212,6 +232,13 @@ export default function App() {
     setCreateDecisionOpen(false);
   }
 
+  function selectSession(next: DecisionSession) {
+    activeSessionId.current = next.id;
+    setSession(next);
+    setResult(resultsBySession[next.id] ?? null);
+    setSearchQuery('');
+  }
+
   if (!auth) {
     return (
       <main className="auth-shell">
@@ -233,7 +260,7 @@ export default function App() {
             {railCollapsed ? '>' : '<'}
           </button>
           <strong>Decision Ledger</strong>
-          <div className="oracle-search">
+          <div className="oracle-search" ref={searchRef}>
             <input
               aria-label="Search votes"
               placeholder="Search votes..."
@@ -241,6 +268,25 @@ export default function App() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
+            {normalizedSearchQuery ? (
+              <ul className="search-results" aria-label="Vote search results">
+                {searchResults.length > 0 ? (
+                  searchResults.map((item) => (
+                    <li key={item.id}>
+                      <button className="search-result-button" type="button" onClick={() => selectSession(item)}>
+                        <span className="search-result-copy">
+                          <strong>{item.title}</strong>
+                          <small>{item.description || 'No summary provided yet.'}</small>
+                        </span>
+                        <small className={`search-result-status search-result-status-${item.status.toLowerCase()}`}>{item.status}</small>
+                      </button>
+                    </li>
+                  ))
+                ) : (
+                  <li className="search-results-empty">No matching votes.</li>
+                )}
+              </ul>
+            ) : null}
           </div>
         </div>
         <nav className="oracle-nav" aria-label="Primary">
@@ -333,11 +379,7 @@ export default function App() {
                 loading={loadingSessions}
                 createOpen={createDecisionOpen}
                 onCreateOpenChange={setCreateDecisionOpen}
-                onSelect={(next) => {
-                  activeSessionId.current = next.id;
-                  setSession(next);
-                  setResult(resultsBySession[next.id] ?? null);
-                }}
+                onSelect={selectSession}
                 onCreate={(payload) =>
                   run(async () => {
                     const created = await api.createSession(token, workspace.id, payload);
