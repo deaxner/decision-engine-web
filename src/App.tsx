@@ -36,6 +36,7 @@ function summarizeSessions(items: DecisionSession[]) {
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(() => loadAuth());
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [createDecisionOpen, setCreateDecisionOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -52,9 +53,6 @@ export default function App() {
   const activeSessionId = useRef<string | null>(null);
 
   const token = auth?.token ?? '';
-  const visibleWorkspaces = searchQuery.trim().length === 0
-    ? workspaces
-    : workspaces.filter((item) => `${item.name} ${item.slug}`.toLowerCase().includes(searchQuery.trim().toLowerCase()));
   const visibleSessions = searchQuery.trim().length === 0
     ? sessions
     : sessions.filter((item) =>
@@ -70,6 +68,22 @@ export default function App() {
       setError(exception instanceof Error ? exception.message : 'Something went wrong.');
     }
   }
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setNotice(''), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setError(''), 4200);
+    return () => window.clearTimeout(timeout);
+  }, [error]);
 
   function updateWorkspaceSummary(workspaceId: string, items: DecisionSession[]) {
     const sessionCounts = summarizeSessions(items);
@@ -195,11 +209,12 @@ export default function App() {
     setSessions(sessionsByWorkspace[next.id] ?? []);
     setSession(null);
     setResult(null);
+    setCreateDecisionOpen(false);
   }
 
   if (!auth) {
     return (
-      <main className="app-shell auth-shell">
+      <main className="auth-shell">
         <AuthLanding notice={notice} error={error} onAuth={acceptAuth} onError={setError} />
       </main>
     );
@@ -220,8 +235,8 @@ export default function App() {
           <strong>Decision Ledger</strong>
           <div className="oracle-search">
             <input
-              aria-label="Search insights"
-              placeholder="Search insights..."
+              aria-label="Search votes"
+              placeholder="Search votes..."
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -266,7 +281,7 @@ export default function App() {
         <div className="rail-panel">
           <WorkspacePanel
             collapsed={railCollapsed}
-            workspaces={visibleWorkspaces}
+            workspaces={workspaces}
             active={workspace}
             onSelect={(next) => selectWorkspaceById(next.id)}
             onCreate={(name) =>
@@ -277,6 +292,17 @@ export default function App() {
                 setNotice('Workspace created.');
               })
             }
+            onInvite={(email) =>
+              run(async () => {
+                if (!workspace) {
+                  return;
+                }
+                await api.addMember(token, workspace.id, email);
+                await refreshWorkspaces(auth, workspace.id);
+                setNotice('Member added.');
+              })
+            }
+            onOpenSettings={() => setNotice('Workspace settings is not available yet.')}
           />
         </div>
       </aside>
@@ -297,18 +323,7 @@ export default function App() {
                   </>
                 ) : null}
               </div>
-              <WorkspaceHeader
-                workspace={workspace}
-                workspaces={workspaces}
-                onSelectWorkspace={selectWorkspaceById}
-                onInvite={(email) =>
-                  run(async () => {
-                    await api.addMember(token, workspace.id, email);
-                    await refreshWorkspaces(auth, workspace.id);
-                    setNotice('Member added.');
-                  })
-                }
-              />
+              <WorkspaceHeader workspace={workspace} onCreateDecision={() => setCreateDecisionOpen(true)} />
               <SessionBoard
                 sessions={visibleSessions}
                 totalSessions={sessions.length}
@@ -316,6 +331,8 @@ export default function App() {
                 workspace={workspace}
                 active={session}
                 loading={loadingSessions}
+                createOpen={createDecisionOpen}
+                onCreateOpenChange={setCreateDecisionOpen}
                 onSelect={(next) => {
                   activeSessionId.current = next.id;
                   setSession(next);
@@ -330,6 +347,7 @@ export default function App() {
                     updateWorkspaceSummary(workspace.id, nextSessions);
                     setSession(created);
                     setResult(null);
+                    setCreateDecisionOpen(false);
                     setNotice('Decision session created.');
                   })
                 }

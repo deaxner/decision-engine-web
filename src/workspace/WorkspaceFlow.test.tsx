@@ -24,8 +24,9 @@ describe('workspace flow', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Product' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'New workspace' }));
+    fireEvent.change(await screen.findByLabelText('Workspace name'), { target: { value: 'Product' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(await screen.findByText('Workspace created.')).toBeInTheDocument();
     expect(screen.getAllByText('Product')).not.toHaveLength(0);
@@ -61,5 +62,27 @@ describe('workspace flow', () => {
 
     expect(await screen.findByDisplayValue('Platform Council')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/11/sessions', expect.any(Object));
+  });
+
+  test('search input does not filter workspaces in the rail', async () => {
+    seedAuth();
+    const secondWorkspace = { ...workspace, id: '11', name: 'Platform Council', slug: 'platform-council' };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([workspace, secondWorkspace]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json([]);
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    fireEvent.change(await screen.findByLabelText('Search votes'), { target: { value: 'jwt' } });
+
+    expect(screen.getByRole('option', { name: 'Product' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Platform Council' })).toBeInTheDocument();
   });
 });

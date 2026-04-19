@@ -18,6 +18,10 @@
   box-shadow: 0 24px 48px rgb(28 28 26 / 4%);
 }
 
+.dashboard-hero-panel-compact {
+  min-height: 100%;
+}
+
 .dashboard-hero-panel::after {
   content: "";
   position: absolute;
@@ -49,11 +53,43 @@
   gap: 12px;
 }
 
+.dashboard-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-card {
+  display: grid;
+  gap: 8px;
+  border-radius: 18px;
+  background: rgb(246 243 240 / 78%);
+  padding: 18px;
+}
+
+.overview-card strong {
+  color: var(--ledger-green);
+  font-family: var(--font-headline);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.overview-card p {
+  margin-bottom: 0;
+  color: #4c5552;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .composer-stepper {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.composer-stepper-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .composer-step {
@@ -103,6 +139,11 @@
   display: grid;
   grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1fr);
   gap: 14px;
+}
+
+.option-builder-list {
+  display: grid;
+  gap: 12px;
 }
 
 .composer-method-card,
@@ -350,6 +391,40 @@
   color: var(--ledger-green);
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgb(7 31 24 / 44%);
+  padding: 24px;
+}
+
+.session-modal {
+  display: grid;
+  gap: 18px;
+  width: min(860px, 100%);
+  max-height: min(90vh, 920px);
+  overflow: auto;
+  border-radius: 24px;
+  background: #fffdf8;
+  padding: 28px;
+  box-shadow: 0 32px 84px rgb(7 31 24 / 18%);
+}
+
+.session-modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.session-modal-close {
+  border: 1px solid rgb(113 121 118 / 14%);
+  background: #fff;
+}
+
 .session-tabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -579,6 +654,7 @@
 }
 
 @media (max-width: 920px) {
+  .dashboard-overview-grid,
   .board-header,
   .composer-stepper,
   .dashboard-session-grid,

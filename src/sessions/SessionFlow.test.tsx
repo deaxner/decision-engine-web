@@ -54,12 +54,15 @@ describe('session flow', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Create decision' }));
     fireEvent.change(await screen.findByLabelText('Decision title'), { target: { value: 'Choose launch plan' } });
     fireEvent.change(screen.getByLabelText('Strategic notes'), { target: { value: 'Pick one' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'RANKED_IRV' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Propose decision' }));
+    fireEvent.change(screen.getByLabelText('Option 1'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByLabelText('Option 2'), { target: { value: 'B' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create decision' })[1]);
     expect(await screen.findByText('Decision session created.')).toBeInTheDocument();
     expect(screen.getAllByText('Choose launch plan')).not.toHaveLength(0);
 
