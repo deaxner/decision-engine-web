@@ -316,7 +316,9 @@
   max-height: min(90vh, 920px);
   overflow: auto;
   border-radius: 24px;
-  background: #fffdf8;
+  background:
+    radial-gradient(circle at top right, rgb(209 180 127 / 16%), transparent 34%),
+    linear-gradient(180deg, #fffdf9 0%, #f7f2e9 100%);
   padding: 28px;
   box-shadow: 0 32px 84px rgb(7 31 24 / 18%);
 }
@@ -582,6 +584,7 @@
   .decision-board-tabs {
     gap: 16px;
     overflow-x: auto;
+    padding-inline: 2px;
   }
 
   .health-card,
@@ -592,10 +595,31 @@
   .decision-stream-card h3 {
     font-size: 1.6rem;
   }
+
+  .workspace-health {
+    padding: 22px;
+  }
+
+  .workspace-side-section,
+  .decision-stream-card {
+    padding: 20px;
+  }
+
+  .decision-stream-footer {
+    gap: 14px;
+  }
+
+  .session-modal {
+    padding: 22px;
+  }
 }
 .workspace-health {
   display: grid;
   gap: 24px;
+  border-radius: 28px;
+  background: rgb(255 253 249 / 82%);
+  padding: 28px;
+  box-shadow: 0 24px 54px rgb(28 28 26 / 5%);
 }
 
 .workspace-health-header {
@@ -655,7 +679,7 @@
   gap: 18px;
   min-height: 240px;
   border-radius: 18px;
-  background: #fff;
+  background: rgb(255 255 255 / 92%);
   padding: 34px 38px;
   box-shadow: 0 20px 40px rgb(28 28 26 / 4%);
 }
@@ -706,6 +730,7 @@
 .workspace-board-main {
   display: grid;
   gap: 26px;
+  min-width: 0;
 }
 
 .decision-board-tabs {
@@ -713,6 +738,7 @@
   align-items: center;
   gap: 36px;
   border-bottom: 1px solid #d8d0c2;
+  padding-bottom: 4px;
 }
 
 .decision-board-tabs button {
@@ -725,12 +751,22 @@
   padding: 0 0 12px;
   font-size: 0.96rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
-.decision-board-tabs button.active {
+.decision-board-tabs button.active,
+.decision-board-tabs button[aria-selected="true"] {
   border-bottom-color: var(--ledger-green-dark);
   color: var(--ledger-green-dark);
   font-weight: 800;
+}
+
+.decision-board-tabs button:focus-visible,
+.decision-stream-card:focus-visible,
+.activity-row-button:focus-visible,
+.workspace-side-button:focus-visible {
+  outline: 3px solid #a8d5c0;
+  outline-offset: 3px;
 }
 
 .decision-stream {
@@ -741,16 +777,28 @@
 .decision-stream-card {
   display: grid;
   gap: 18px;
-  border: 0;
+  border: 1px solid rgb(113 121 118 / 10%);
   border-radius: 20px;
-  background: transparent;
-  padding: 18px 0 26px;
+  background: rgb(255 253 249 / 90%);
+  padding: 22px 24px 24px;
   text-align: left;
+  box-shadow: 0 16px 34px rgb(28 28 26 / 4%);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
-.decision-stream-card + .decision-stream-card {
-  border-top: 1px solid #eee8dd;
-  padding-top: 28px;
+.decision-stream-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgb(28 28 26 / 7%);
+}
+
+.decision-stream-card.active {
+  border-color: rgb(1 38 31 / 18%);
+  background: #fff;
+  box-shadow: 0 22px 44px rgb(1 38 31 / 10%);
 }
 
 .decision-stream-card.active h3 {
@@ -819,11 +867,16 @@
   color: #343e3a;
   font-size: 1rem;
   line-height: 1.55;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .decision-stream-footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 28px;
 }
 
@@ -842,7 +895,7 @@
 }
 
 .decision-stream-card-empty {
-  background: #fff;
+  background: rgb(255 255 255 / 94%);
   padding: 28px 32px;
   box-shadow: 0 18px 32px rgb(28 28 26 / 4%);
 }
@@ -855,6 +908,10 @@
 .workspace-side-section {
   display: grid;
   gap: 18px;
+  border-radius: 22px;
+  background: rgb(255 253 249 / 88%);
+  padding: 22px;
+  box-shadow: 0 18px 34px rgb(28 28 26 / 4%);
 }
 
 .workspace-side-section h4 {
@@ -876,7 +933,7 @@
   display: grid;
   gap: 10px;
   border-radius: 18px;
-  background: #f0ece4;
+  background: #f5f1e9;
   padding: 22px 24px;
 }
 
@@ -910,7 +967,7 @@
   border: 0;
   border-radius: 16px;
   background: transparent;
-  padding: 0;
+  padding: 10px 12px;
   text-align: left;
 }
 
@@ -942,4 +999,5 @@
   font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  box-shadow: 0 14px 28px rgb(28 28 26 / 4%);
 }

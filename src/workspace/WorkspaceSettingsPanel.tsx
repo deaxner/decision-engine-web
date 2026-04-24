@@ -6,7 +6,7 @@ export function WorkspaceSettingsPanel({
   onInvite,
 }: {
   workspace: Workspace;
-  onInvite: (email: string) => void;
+  onInvite: (email: string) => Promise<boolean>;
 }) {
   return (
     <section className="workspace-settings-layout">
@@ -50,8 +50,15 @@ export function WorkspaceSettingsPanel({
             onSubmit={(event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              onInvite(String(form.get('email') ?? ''));
-              event.currentTarget.reset();
+              const email = String(form.get('email') ?? '').trim();
+              if (!email) {
+                return;
+              }
+              void onInvite(email).then((success) => {
+                if (success) {
+                  event.currentTarget.reset();
+                }
+              });
             }}
           >
             <label>

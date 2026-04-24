@@ -24,6 +24,9 @@ export function AppTopbar({
   onSelectSession: (session: DecisionSession) => void;
   onSignOut: () => void;
 }) {
+  const searchResultsId = 'vote-search-results';
+  const searchOpen = normalizedSearchQuery.length > 0;
+
   return (
     <header className="oracle-topbar">
       <div className="oracle-brand">
@@ -39,13 +42,21 @@ export function AppTopbar({
         <div className="oracle-search" ref={searchRef}>
           <input
             aria-label="Search votes"
+            aria-autocomplete="list"
+            aria-controls={searchResultsId}
+            aria-expanded={searchOpen}
             placeholder="Search votes..."
             type="text"
             value={searchQuery}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && searchOpen) {
+                onSearchChange('');
+              }
+            }}
             onChange={(event) => onSearchChange(event.target.value)}
           />
-          {normalizedSearchQuery ? (
-            <ul className="search-results" aria-label="Vote search results">
+          {searchOpen ? (
+            <ul className="search-results" aria-label="Vote search results" id={searchResultsId}>
               {searchResults.length > 0 ? (
                 searchResults.map((item) => (
                   <li key={item.id}>
@@ -65,25 +76,12 @@ export function AppTopbar({
           ) : null}
         </div>
       </div>
-      <nav className="oracle-nav" aria-label="Primary">
-        <a href="#workspaces" className="active">
-          Workspaces
-        </a>
-        <a href="#insights">Insights</a>
-        <a href="#archive">Archive</a>
-        <a href="#settings">Settings</a>
-      </nav>
       <div className="oracle-actions">
-        <button className="icon-button" aria-label="Notifications" type="button">
-          N
-        </button>
-        <button className="icon-button" aria-label="Help" type="button">
-          ?
-        </button>
+        <p className="topbar-context">Search decisions, drafts, and assignees</p>
         <div className="profile-chip" aria-label={`Signed in as ${auth.user.display_name}`}>
           {auth.user.display_name.slice(0, 1).toUpperCase()}
         </div>
-        <button className="ghost-button" onClick={onSignOut}>
+        <button className="ghost-button" type="button" onClick={onSignOut}>
           Sign out
         </button>
       </div>

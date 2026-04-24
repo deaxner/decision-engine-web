@@ -4,8 +4,11 @@
   display: grid;
   gap: 14px;
   border-radius: 28px;
-  background: #f6f3f0;
+  background:
+    radial-gradient(circle at top right, rgb(209 180 127 / 14%), transparent 36%),
+    rgb(246 243 240 / 92%);
   padding: 28px;
+  box-shadow: 0 24px 48px rgb(28 28 26 / 6%);
 }
 
 .results-title {
@@ -29,8 +32,9 @@
   margin-top: 12px;
   border: 1px solid rgb(113 121 118 / 12%);
   border-radius: 18px;
-  background: white;
+  background: rgb(255 255 255 / 94%);
   padding: 16px;
+  box-shadow: 0 14px 28px rgb(28 28 26 / 4%);
 }
 
 .round-card-header {
@@ -119,8 +123,9 @@
 
 .metric-grid div {
   border-radius: 16px;
-  background: white;
+  background: rgb(255 255 255 / 94%);
   padding: 14px;
+  box-shadow: inset 0 0 0 1px rgb(113 121 118 / 8%);
 }
 
 .metric-grid dt {
@@ -143,6 +148,10 @@
 }
 
 @media (max-width: 920px) {
+  .results-pane {
+    padding: 22px;
+  }
+
   .metric-grid {
     grid-template-columns: 1fr;
   }

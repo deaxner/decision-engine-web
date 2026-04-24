@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { AppTopbar } from './app/AppTopbar';
 import { CreateWorkspaceModal } from './app/CreateWorkspaceModal';
 import { useResultSubscription } from './app/useResultSubscription';
@@ -54,18 +54,28 @@ export default function App() {
   const openSessions =
     workspaceController.workspace?.session_counts.open ??
     sessionController.sessions.filter((item) => item.status === 'OPEN').length;
+  const canCreateDecision = workspaceController.workspace?.role === 'OWNER';
+  const handleWorkspaceActivated = useEffectEvent(async () => {
+    const nextWorkspace = workspaceController.workspace;
+    workspaceController.activeWorkspaceId.current = nextWorkspace?.id ?? null;
+
+    if (!nextWorkspace) {
+      return;
+    }
+
+    await run(() => sessionController.refreshSessions(nextWorkspace));
+    await workspaceController.refreshDashboard(nextWorkspace);
+    await workspaceController.refreshMembers(nextWorkspace);
+  });
 
   useEffect(() => {
     if (auth) {
       void run(() => workspaceController.refreshWorkspaces(auth));
     }
-  }, []);
+  }, [auth]);
 
   useEffect(() => {
-    workspaceController.activeWorkspaceId.current = workspaceController.workspace?.id ?? null;
-    void run(sessionController.refreshSessions);
-    void workspaceController.refreshDashboard();
-    void workspaceController.refreshMembers();
+    void handleWorkspaceActivated();
   }, [workspaceController.workspace?.id]);
 
   useEffect(() => {
@@ -134,6 +144,7 @@ export default function App() {
         workspaces={workspaceController.workspaces}
         active={workspaceController.workspace}
         openSessions={openSessions}
+        canCreateDecision={canCreateDecision}
         onSelectWorkspace={selectWorkspaceById}
         onCreateDecision={() => sessionController.setCreateDecisionOpen(true)}
       />

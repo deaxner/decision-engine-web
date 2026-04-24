@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { DecisionSession, VotingType, Workspace, WorkspaceDashboard, WorkspaceMember } from '../types';
 import './sessions.css';
 
@@ -96,6 +97,18 @@ function formatActivityTime(value: string) {
   }).format(new Date(value));
 }
 
+function getFocusableElements(container: HTMLElement | null) {
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  );
+}
+
 type BoardView = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
 export function SessionBoard({
@@ -109,6 +122,7 @@ export function SessionBoard({
   members,
   loadingMembers,
   createOpen,
+  canCreateDecision,
   onCreateOpenChange,
   onSelect,
   onSelectActivitySession,
@@ -125,11 +139,12 @@ export function SessionBoard({
   members: WorkspaceMember[];
   loadingMembers: boolean;
   createOpen: boolean;
+  canCreateDecision: boolean;
   onCreateOpenChange: (open: boolean) => void;
   onSelect: (session: DecisionSession) => void;
   onSelectActivitySession: (sessionId: string) => void;
   onRetryDashboard: () => void;
-  onCreate: (payload: { title: string; description?: string; voting_type: VotingType; category?: string; due_at?: string; assignee_ids?: string[]; option_titles?: string[] }) => void;
+  onCreate: (payload: { title: string; description?: string; voting_type: VotingType; category?: string; due_at?: string; assignee_ids?: string[]; option_titles?: string[] }) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -140,6 +155,14 @@ export function SessionBoard({
   const [options, setOptions] = useState<string[]>(['', '']);
   const [step, setStep] = useState(1);
   const [boardView, setBoardView] = useState<BoardView>('ACTIVE');
+  const boardPanelId = useId();
+  const dialogTitleId = useId();
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const tabRefs = useRef<Record<BoardView, HTMLButtonElement | null>>({
+    ACTIVE: null,
+    DRAFT: null,
+    ARCHIVED: null,
+  });
 
   useEffect(() => {
     if (!createOpen) {
@@ -154,13 +177,8 @@ export function SessionBoard({
     }
   }, [createOpen]);
 
-  useEffect(() => {
-    if (boardView === 'ACTIVE' && workspace.session_counts.open === 0 && workspace.session_counts.draft > 0) {
-      setBoardView('DRAFT');
-    }
-  }, [boardView, workspace.session_counts.draft, workspace.session_counts.open]);
-
   const optionValues = options.map((item) => item.trim()).filter(Boolean);
+  const canSubmitCreate = title.trim().length > 0 && optionValues.length >= 2;
   const grouped = boardGroups(sessions);
   const visibleSessions = grouped[boardView];
   const dashboardWorkspace = dashboard?.workspace ?? workspace;
@@ -168,17 +186,103 @@ export function SessionBoard({
   const insights = dashboard?.insights ?? [];
   const activity = dashboard?.activity ?? [];
 
-  function submitCreate() {
-    onCreate({
-      title,
-      description: description || undefined,
+  useEffect(() => {
+    if (!createOpen) {
+      return;
+    }
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onCreateOpenChange(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusable = getFocusableElements(dialogRef.current);
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    const [firstFocusable] = getFocusableElements(dialogRef.current);
+    firstFocusable?.focus();
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [createOpen, onCreateOpenChange]);
+
+  function focusBoardTab(nextView: BoardView) {
+    setBoardView(nextView);
+    tabRefs.current[nextView]?.focus();
+  }
+
+  function handleTabKeyDown(currentView: BoardView, event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const tabs: BoardView[] = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
+    const currentIndex = tabs.indexOf(currentView);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      focusBoardTab(tabs[(currentIndex + 1) % tabs.length]);
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      focusBoardTab(tabs[(currentIndex - 1 + tabs.length) % tabs.length]);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      focusBoardTab(tabs[0]);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      focusBoardTab(tabs[tabs.length - 1]);
+    }
+  }
+
+  async function submitCreate() {
+    if (!canSubmitCreate) {
+      return;
+    }
+
+    const created = await onCreate({
+      title: title.trim(),
+      description: description.trim() || undefined,
       voting_type: votingType,
       category: category.trim() || undefined,
       due_at: dateInputToIso(dueAt),
       assignee_ids: assigneeIds,
       option_titles: optionValues,
     });
-    onCreateOpenChange(false);
+    if (created) {
+      onCreateOpenChange(false);
+    }
   }
 
   function updateOption(index: number, value: string) {
@@ -246,21 +350,65 @@ export function SessionBoard({
 
       <section className="workspace-board-layout">
         <div className="workspace-board-main">
-          <div className="decision-board-tabs" role="tablist" aria-label="Decision board views">
-            <button className={boardView === 'ACTIVE' ? 'active' : ''} type="button" onClick={() => setBoardView('ACTIVE')}>
+          <div className="decision-board-tabs" role="tablist" aria-label="Decision board views" aria-orientation="horizontal">
+            <button
+              aria-controls={boardPanelId}
+              aria-selected={boardView === 'ACTIVE'}
+              className={boardView === 'ACTIVE' ? 'active' : ''}
+              id="board-tab-active"
+              role="tab"
+              tabIndex={boardView === 'ACTIVE' ? 0 : -1}
+              type="button"
+              ref={(element) => {
+                tabRefs.current.ACTIVE = element;
+              }}
+              onKeyDown={(event) => handleTabKeyDown('ACTIVE', event)}
+              onClick={() => setBoardView('ACTIVE')}
+            >
               Active Decisions
             </button>
-            <button className={boardView === 'DRAFT' ? 'active' : ''} type="button" onClick={() => setBoardView('DRAFT')}>
+            <button
+              aria-controls={boardPanelId}
+              aria-selected={boardView === 'DRAFT'}
+              className={boardView === 'DRAFT' ? 'active' : ''}
+              id="board-tab-draft"
+              role="tab"
+              tabIndex={boardView === 'DRAFT' ? 0 : -1}
+              type="button"
+              ref={(element) => {
+                tabRefs.current.DRAFT = element;
+              }}
+              onKeyDown={(event) => handleTabKeyDown('DRAFT', event)}
+              onClick={() => setBoardView('DRAFT')}
+            >
               Draft Items
             </button>
-            <button className={boardView === 'ARCHIVED' ? 'active' : ''} type="button" onClick={() => setBoardView('ARCHIVED')}>
+            <button
+              aria-controls={boardPanelId}
+              aria-selected={boardView === 'ARCHIVED'}
+              className={boardView === 'ARCHIVED' ? 'active' : ''}
+              id="board-tab-archived"
+              role="tab"
+              tabIndex={boardView === 'ARCHIVED' ? 0 : -1}
+              type="button"
+              ref={(element) => {
+                tabRefs.current.ARCHIVED = element;
+              }}
+              onKeyDown={(event) => handleTabKeyDown('ARCHIVED', event)}
+              onClick={() => setBoardView('ARCHIVED')}
+            >
               Archived Log
             </button>
           </div>
 
           {loading ? <p className="inline-status">Refreshing sessions...</p> : null}
 
-          <div className="decision-stream">
+          <div
+            aria-labelledby={boardView === 'ACTIVE' ? 'board-tab-active' : boardView === 'DRAFT' ? 'board-tab-draft' : 'board-tab-archived'}
+            className="decision-stream"
+            id={boardPanelId}
+            role="tabpanel"
+          >
             {visibleSessions.length > 0 ? (
               visibleSessions.map((item) => (
                 <button key={item.id} className={active?.id === item.id ? 'decision-stream-card active' : 'decision-stream-card'} type="button" onClick={() => onSelect(item)}>
@@ -380,25 +528,25 @@ export function SessionBoard({
         </aside>
       </section>
 
-      {createOpen ? (
+      {createOpen && canCreateDecision ? (
         <div className="modal-overlay" role="presentation" onClick={() => onCreateOpenChange(false)}>
           <section
             className="session-modal"
-            aria-labelledby="create-decision-title"
+            aria-labelledby={dialogTitleId}
             aria-modal="true"
+            ref={dialogRef}
             role="dialog"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="session-modal-header">
               <div>
                 <p className="small-heading">Create decision</p>
-                <h2 id="create-decision-title">Start a new decision</h2>
+                <h2 id={dialogTitleId}>Start a new decision</h2>
               </div>
               <button className="icon-button session-modal-close" type="button" aria-label="Close create decision modal" onClick={() => onCreateOpenChange(false)}>
                 x
               </button>
             </div>
-            <p className="muted">Define the decision, choose the voting method, and line up options before the draft is created.</p>
             <form
               className="dashboard-session-form"
               onSubmit={(event) => {
@@ -407,7 +555,7 @@ export function SessionBoard({
                   setStep((current) => current + 1);
                   return;
                 }
-                submitCreate();
+                void submitCreate();
               }}
             >
               <div className="composer-stepper" aria-label="Create decision steps">
@@ -497,7 +645,7 @@ export function SessionBoard({
                     <p className="muted">
                       {optionValues.length >= 2
                         ? `${optionValues.length} options will be available immediately in draft.`
-                        : 'Add at least two options now, or continue editing after the draft is created.'}
+                        : 'Add at least two options before creating the draft.'}
                     </p>
                   </div>
                   <div className="assignee-picker">
@@ -545,7 +693,7 @@ export function SessionBoard({
                     Next
                   </button>
                 ) : (
-                  <button className="primary-button" type="submit" disabled={title.trim().length === 0}>
+                  <button className="primary-button" type="submit" disabled={!canSubmitCreate}>
                     Create decision
                   </button>
                 )}

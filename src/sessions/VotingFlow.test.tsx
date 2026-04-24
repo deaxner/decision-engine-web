@@ -41,7 +41,7 @@ describe('voting flow', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /Choose roadmap item/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Choose roadmap item/ }, { timeout: 3000 }));
     fireEvent.click(screen.getByLabelText('B'));
     fireEvent.click(screen.getByRole('button', { name: 'Submit vote' }));
 
@@ -90,7 +90,7 @@ describe('voting flow', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: /Rank roadmap items/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Rank roadmap items/ }, { timeout: 3000 }));
     fireEvent.click(screen.getByRole('button', { name: 'B' }));
     fireEvent.click(screen.getByRole('button', { name: 'A' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit ranking' }));

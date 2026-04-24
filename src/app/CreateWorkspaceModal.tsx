@@ -1,6 +1,19 @@
+import { useEffect, useRef } from 'react';
 import type { useResultSubscription } from './useResultSubscription';
 import type { useSessionController } from './useSessionController';
 import type { useWorkspaceController } from './useWorkspaceController';
+
+function getFocusableElements(container: HTMLElement | null) {
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  );
+}
 
 export function CreateWorkspaceModal({
   workspaceController,
@@ -11,15 +24,61 @@ export function CreateWorkspaceModal({
   workspaceController: ReturnType<typeof useWorkspaceController>;
   sessionController: ReturnType<typeof useSessionController>;
   resultController: ReturnType<typeof useResultSubscription>;
-  run: (action: () => Promise<void>) => Promise<void>;
+  run: (action: () => Promise<void>) => Promise<boolean>;
 }) {
+  const dialogRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!workspaceController.createWorkspaceOpen) {
+      return;
+    }
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        workspaceController.setCreateWorkspaceOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusable = getFocusableElements(dialogRef.current);
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    const [firstFocusable] = getFocusableElements(dialogRef.current);
+    firstFocusable?.focus();
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [workspaceController.createWorkspaceOpen, workspaceController.setCreateWorkspaceOpen]);
+
   if (!workspaceController.createWorkspaceOpen) {
     return null;
   }
 
   return (
     <div className="modal-overlay" role="presentation" onClick={() => workspaceController.setCreateWorkspaceOpen(false)}>
-      <section className="session-modal session-modal-compact" role="dialog" aria-modal="true" aria-labelledby="create-workspace-title" onClick={(event) => event.stopPropagation()}>
+      <section className="session-modal session-modal-compact" role="dialog" aria-modal="true" aria-labelledby="create-workspace-title" ref={dialogRef} onClick={(event) => event.stopPropagation()}>
         <div className="session-modal-header">
           <div>
             <p className="small-heading">Workspace</p>
@@ -30,20 +89,25 @@ export function CreateWorkspaceModal({
           </button>
         </div>
         <form
-          className="dashboard-session-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void run(async () => {
-              await workspaceController.createWorkspace(workspaceController.newWorkspaceName);
-              sessionController.clearSessionState();
-              resultController.clearResultState();
-            });
-          }}
-        >
-          <label>
-            Workspace name
-            <input value={workspaceController.newWorkspaceName} onChange={(event) => workspaceController.setNewWorkspaceName(event.target.value)} placeholder="Architecture Council" required />
-          </label>
+            className="dashboard-session-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(async () => {
+                await workspaceController.createWorkspace(workspaceController.newWorkspaceName);
+                sessionController.clearSessionState();
+                resultController.clearResultState();
+              });
+            }}
+          >
+            <label>
+              Workspace name
+              <input
+                value={workspaceController.newWorkspaceName}
+                onChange={(event) => workspaceController.setNewWorkspaceName(event.target.value)}
+                placeholder="Architecture Council"
+                required
+              />
+            </label>
           <div className="dashboard-session-actions">
             <button className="secondary-button" type="button" onClick={() => workspaceController.setCreateWorkspaceOpen(false)}>
               Cancel

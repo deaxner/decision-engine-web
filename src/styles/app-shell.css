@@ -5,7 +5,9 @@
 
 .app-shell-auth {
   padding: 0;
-  background: #fcf9f6;
+  background:
+    radial-gradient(circle at top left, rgb(255 255 255 / 88%), transparent 28%),
+    linear-gradient(180deg, #fcf9f6 0%, #f4efe6 100%);
 }
 
 .oracle-topbar {
@@ -19,9 +21,9 @@
   height: 76px;
   padding: 0 40px;
   border-bottom: 1px solid rgb(113 121 118 / 10%);
-  background: rgb(252 249 246 / 86%);
+  background: rgb(252 249 246 / 82%);
   backdrop-filter: blur(20px);
-  box-shadow: 0 22px 48px rgb(28 28 26 / 5%);
+  box-shadow: 0 18px 42px rgb(28 28 26 / 6%);
 }
 
 .oracle-brand {
@@ -48,8 +50,9 @@
   display: flex;
   align-items: center;
   min-width: 320px;
-  border-radius: 4px;
-  background: #f0edea;
+  border: 1px solid rgb(113 121 118 / 10%);
+  border-radius: 16px;
+  background: rgb(240 237 234 / 92%);
   padding: 8px 14px;
 }
 
@@ -61,8 +64,9 @@
   color: #414846;
 }
 
-.oracle-search input:focus {
-  outline: 0;
+.oracle-search:focus-within {
+  outline: 3px solid #a8d5c0;
+  outline-offset: 1px;
 }
 
 .search-results {
@@ -75,8 +79,9 @@
   border: 1px solid rgb(113 121 118 / 14%);
   border-radius: 18px;
   background: rgb(252 249 246 / 98%);
-  box-shadow: 0 18px 40px rgb(28 28 26 / 12%);
+  box-shadow: 0 22px 50px rgb(28 28 26 / 14%);
   list-style: none;
+  z-index: 5;
 }
 
 .search-result-button {
@@ -93,6 +98,12 @@
 }
 
 .search-result-button:hover {
+  background: #f1eeea;
+}
+
+.search-result-button:focus-visible {
+  outline: 3px solid #a8d5c0;
+  outline-offset: 2px;
   background: #f1eeea;
 }
 
@@ -142,33 +153,18 @@
   font-size: 0.82rem;
 }
 
-.oracle-nav {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-}
-
-.oracle-nav a {
-  border-bottom: 2px solid transparent;
-  color: #66716d;
-  padding-bottom: 2px;
-  font-family: var(--font-headline);
-  font-size: 1.06rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: color 150ms ease;
-}
-
-.oracle-nav a.active,
-.oracle-nav a:hover {
-  border-bottom-color: var(--ledger-green);
-  color: var(--ledger-green);
-}
-
 .oracle-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.topbar-context {
+  margin: 0;
+  color: #66716d;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .icon-button {
@@ -186,6 +182,12 @@
 
 .icon-button:hover {
   background: #eae8e5;
+}
+
+.icon-button:focus-visible,
+.oracle-topbar .ghost-button:focus-visible {
+  outline: 3px solid #a8d5c0;
+  outline-offset: 2px;
 }
 
 .profile-chip {
@@ -214,7 +216,11 @@
   gap: 22px;
   width: 288px;
   padding: 28px 18px;
-  background: #ece8e1;
+  overflow-y: auto;
+  border-right: 1px solid rgb(18 63 49 / 7%);
+  background:
+    linear-gradient(180deg, rgb(236 232 225 / 96%), rgb(230 225 217 / 94%)),
+    linear-gradient(180deg, transparent, rgb(18 63 49 / 3%));
   transition: width 180ms ease, padding 180ms ease;
 }
 
@@ -224,7 +230,9 @@
 }
 
 .rail-header {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .rail-header h2 {
@@ -253,7 +261,21 @@
 }
 
 .rail-meta {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rail-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  background: rgb(255 253 248 / 72%);
+  color: #50605b;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .rail-panel {
@@ -287,6 +309,22 @@
   padding: 8px 24px 40px;
 }
 
+.canvas-shell::before {
+  content: "";
+  position: fixed;
+  inset: 92px 28px 24px 316px;
+  z-index: -1;
+  border-radius: 36px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 44%), rgb(255 255 255 / 18%)),
+    radial-gradient(circle at top right, rgb(193 176 113 / 8%), transparent 34%);
+  pointer-events: none;
+}
+
+.rail-collapsed .canvas-shell::before {
+  inset: 92px 28px 24px 124px;
+}
+
 .breadcrumb-trail {
   display: flex;
   align-items: center;
@@ -300,17 +338,34 @@
 }
 
 @media (max-width: 1100px) {
-  .oracle-search,
-  .oracle-nav {
-    display: none;
+  .oracle-search {
+    min-width: 240px;
+  }
+
+  .canvas-shell::before {
+    inset: 92px 18px 18px 18px;
   }
 }
 
 @media (max-width: 920px) {
+  .oracle-brand {
+    flex: 1;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .oracle-search {
+    min-width: 0;
+    flex: 1;
+  }
+
   .workspace-rail {
     position: static;
     width: auto;
-    padding-top: 100px;
+    gap: 16px;
+    padding: 100px 16px 18px;
+    border-right: 0;
+    border-bottom: 1px solid rgb(18 63 49 / 7%);
   }
 
   .app-canvas {
@@ -321,7 +376,25 @@
     padding: 0;
   }
 
+  .canvas-shell::before {
+    display: none;
+  }
+
   .oracle-topbar {
     padding: 0 16px;
+  }
+
+  .oracle-actions .ghost-button {
+    display: none;
+  }
+
+  .topbar-context {
+    display: none;
+  }
+
+  .breadcrumb-trail {
+    margin-bottom: 20px;
+    overflow-x: auto;
+    white-space: nowrap;
   }
 }

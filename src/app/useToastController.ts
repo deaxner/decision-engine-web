@@ -8,8 +8,10 @@ export function useToastController() {
     setError('');
     try {
       await action();
+      return true;
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'Something went wrong.');
+      return false;
     }
   }
 

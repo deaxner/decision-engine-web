@@ -121,4 +121,29 @@ describe('workspace flow', () => {
     expect(await screen.findByText('Members and access')).toBeInTheDocument();
     expect(screen.getByText('Add collaborator')).toBeInTheDocument();
   });
+
+  test('hides decision creation controls for member workspaces', async () => {
+    seedAuth();
+    const memberWorkspace = { ...workspace, role: 'MEMBER' as const };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/workspaces') && !init?.method) {
+        return json([memberWorkspace]);
+      }
+      if (url.endsWith('/workspaces/10/sessions')) {
+        return json([]);
+      }
+      if (url.endsWith('/workspaces/10/dashboard')) {
+        return json(dashboardFor(memberWorkspace));
+      }
+      return json({ error: 'unexpected' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText('Team Node')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create decision' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ New Decision' })).not.toBeInTheDocument();
+  });
 });

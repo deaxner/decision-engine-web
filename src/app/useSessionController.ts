@@ -71,6 +71,13 @@ export function useSessionController({
     }
     const latest = await api.getSession(token, currentSession.id);
     setSession(latest);
+    setSessions((items) => items.map((item) => (item.id === latest.id ? latest : item)));
+    if (workspace) {
+      setSessionsByWorkspace((cache) => ({
+        ...cache,
+        [workspace.id]: (cache[workspace.id] ?? []).map((item) => (item.id === latest.id ? latest : item)),
+      }));
+    }
   }
 
   function selectWorkspaceSessions(next: Workspace) {
@@ -124,10 +131,15 @@ export function useSessionController({
     if (optionTitles.length > 0) {
       created = await api.getSession(token, created.id);
     }
-    const nextSessions = [created, ...sessions];
-    setSessions(nextSessions);
-    setSessionsByWorkspace((cache) => ({ ...cache, [workspace.id]: nextSessions }));
-    updateWorkspaceSummary(workspace.id, nextSessions);
+    setSessions((items) => {
+      const nextSessions = [created, ...items];
+      updateWorkspaceSummary(workspace.id, nextSessions);
+      return nextSessions;
+    });
+    setSessionsByWorkspace((cache) => ({
+      ...cache,
+      [workspace.id]: [created, ...(cache[workspace.id] ?? sessions)],
+    }));
     setSession(created);
     setCreateDecisionOpen(false);
     setCanvasMode('detail');
@@ -141,7 +153,7 @@ export function useSessionController({
       return;
     }
 
-    await api.addOption(token, session.id, title);
+    await api.addOption(token, session.id, title.trim());
     await refreshSession(session);
     await refreshSessions(workspace);
     await refreshDashboard(workspace);

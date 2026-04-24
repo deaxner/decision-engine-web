@@ -33,7 +33,8 @@ describe('auth flow', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Enter workspace' }));
 
-    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New workspace' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Search votes')).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem('decision-engine-auth') as string)).toEqual(auth);
   });
 
@@ -61,7 +62,8 @@ describe('auth flow', () => {
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Owner' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create ledger account' }));
 
-    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New workspace' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Search votes')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/register',
       expect.objectContaining({

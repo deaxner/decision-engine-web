@@ -25,9 +25,9 @@ export function SessionDetail({
   session: DecisionSession;
   result: SessionResult | null;
   loadingResult: boolean;
-  onAddOption: (title: string) => void;
-  onStatus: (status: 'OPEN' | 'CLOSED') => void;
-  onVote: (optionIds: string[]) => void;
+  onAddOption: (title: string) => Promise<boolean>;
+  onStatus: (status: 'OPEN' | 'CLOSED') => Promise<boolean>;
+  onVote: (optionIds: string[]) => Promise<boolean>;
 }) {
   const canOpen = session.status === 'DRAFT' && session.options.length >= 2;
 
@@ -58,10 +58,10 @@ export function SessionDetail({
           ) : null}
         </header>
         <div className="action-strip">
-          <button className="primary-button" onClick={() => onStatus('OPEN')} disabled={!canOpen}>
+          <button className="primary-button" type="button" onClick={() => void onStatus('OPEN')} disabled={!canOpen}>
             Open voting
           </button>
-          <button className="secondary-button" onClick={() => onStatus('CLOSED')} disabled={session.status !== 'OPEN'}>
+          <button className="secondary-button" type="button" onClick={() => void onStatus('CLOSED')} disabled={session.status !== 'OPEN'}>
             Close
           </button>
         </div>

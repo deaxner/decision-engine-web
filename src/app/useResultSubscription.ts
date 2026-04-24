@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { api } from '../api';
 import type { AuthState, DecisionSession, SessionResult, Workspace } from '../types';
@@ -29,6 +29,14 @@ export function useResultSubscription({
   const [result, setResult] = useState<SessionResult | null>(null);
   const [resultsBySession, setResultsBySession] = useState<Record<string, SessionResult | null>>({});
   const [loadingResult, setLoadingResult] = useState(false);
+  const handleResultUpdated = useEffectEvent(async (currentSession: DecisionSession, currentWorkspace: Workspace | null) => {
+    await run(async () => {
+      await refreshSession(currentSession);
+      await refreshResult(currentSession);
+      await refreshWorkspaces(auth, currentWorkspace?.id);
+      await refreshDashboard(currentWorkspace);
+    });
+  });
 
   async function refreshResult(currentSession = session) {
     if (!currentSession || !token || currentSession.status === 'DRAFT') {
@@ -71,16 +79,11 @@ export function useResultSubscription({
     const url = `${MERCURE_URL}?topic=${encodeURIComponent(`/sessions/${session.id}/results`)}`;
     const events = new EventSource(url);
     events.addEventListener('result_updated', () => {
-      void run(async () => {
-        await refreshSession(session);
-        await refreshResult(session);
-        await refreshWorkspaces(auth, workspace?.id);
-        await refreshDashboard(workspace);
-      });
+      void handleResultUpdated(session, workspace);
     });
 
     return () => events.close();
-  }, [session?.id, session?.status, token]);
+  }, [session?.id, session?.status, token, workspace?.id]);
 
   return {
     result,

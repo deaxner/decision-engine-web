@@ -6,6 +6,7 @@ export function WorkspaceRail({
   workspaces,
   active,
   openSessions,
+  canCreateDecision,
   onSelectWorkspace,
   onCreateDecision,
 }: {
@@ -13,6 +14,7 @@ export function WorkspaceRail({
   workspaces: Workspace[];
   active: Workspace | null;
   openSessions: number;
+  canCreateDecision: boolean;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateDecision: () => void;
 }) {
@@ -35,7 +37,7 @@ export function WorkspaceRail({
           workspaces={workspaces}
           active={active}
           onSelect={(next) => onSelectWorkspace(next.id)}
-          onCreateDecision={onCreateDecision}
+          onCreateDecision={canCreateDecision ? onCreateDecision : undefined}
         />
       </div>
     </aside>

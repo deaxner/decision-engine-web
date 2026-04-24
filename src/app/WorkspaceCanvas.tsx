@@ -21,8 +21,10 @@ export function WorkspaceCanvas({
   workspaceController: ReturnType<typeof useWorkspaceController>;
   sessionController: ReturnType<typeof useSessionController>;
   resultController: ReturnType<typeof useResultSubscription>;
-  run: (action: () => Promise<void>) => Promise<void>;
+  run: (action: () => Promise<void>) => Promise<boolean>;
 }) {
+  const canCreateDecision = workspaceController.workspace?.role === 'OWNER';
+
   return (
     <section className="app-canvas">
       <div className="canvas-shell">
@@ -49,7 +51,7 @@ export function WorkspaceCanvas({
             <WorkspaceHeader
               workspace={workspaceController.workspace}
               mode={sessionController.canvasMode}
-              onCreateDecision={() => sessionController.setCreateDecisionOpen(true)}
+              onCreateDecision={canCreateDecision ? () => sessionController.setCreateDecisionOpen(true) : undefined}
               onOpenSettings={() => sessionController.setCanvasMode('settings')}
               onOpenCreateWorkspace={() => workspaceController.setCreateWorkspaceOpen(true)}
               onBackToBoard={() => sessionController.setCanvasMode('board')}
@@ -66,6 +68,7 @@ export function WorkspaceCanvas({
                 members={workspaceController.workspaceMembers}
                 loadingMembers={workspaceController.loadingMembers}
                 createOpen={sessionController.createDecisionOpen}
+                canCreateDecision={canCreateDecision}
                 onCreateOpenChange={sessionController.setCreateDecisionOpen}
                 onSelect={sessionController.selectSession}
                 onSelectActivitySession={sessionController.selectSessionById}

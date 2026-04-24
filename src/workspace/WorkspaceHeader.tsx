@@ -11,7 +11,7 @@ export function WorkspaceHeader({
 }: {
   workspace: Workspace;
   mode: "board" | "detail" | "settings";
-  onCreateDecision: () => void;
+  onCreateDecision?: () => void;
   onOpenSettings: () => void;
   onOpenCreateWorkspace: () => void;
   onBackToBoard: () => void;
@@ -21,14 +21,6 @@ export function WorkspaceHeader({
       <div className="workspace-header-copy">
         <p className="eyebrow">{workspace.slug}</p>
         <h2>{workspace.name}</h2>
-
-        <p className="muted">
-          {mode === "board"
-            ? "Scan live decisions, review workspace health, and open one focused detail view at a time."
-            : mode === "settings"
-              ? "Manage collaborators and workspace-level context in a secondary surface."
-              : "Focus on one decision at a time without the board competing for attention."}
-        </p>
         <p className="workspace-header-meta">{`${workspace.member_count} members | ${workspace.session_counts.open} active sessions | ${workspace.session_counts.closed} archived`}</p>
       </div>
       <div className="workspace-header-actions">
@@ -65,7 +57,7 @@ export function WorkspaceHeader({
         >
           New workspace
         </button>
-        {mode !== "settings" ? (
+        {mode !== "settings" && onCreateDecision ? (
           <button
             className="primary-button workspace-header-button"
             type="button"

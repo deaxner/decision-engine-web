@@ -78,11 +78,15 @@ describe('session flow', () => {
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'RANKED_IRV' } });
     fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2026-04-28' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getAllByRole('button', { name: 'Create decision' })[1]).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Option 1'), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText('Option 2'), { target: { value: 'B' } });
+    expect(screen.getAllByRole('button', { name: 'Create decision' })[1]).not.toBeDisabled();
     fireEvent.click(screen.getByLabelText(/Member User/i));
     fireEvent.click(screen.getAllByRole('button', { name: 'Create decision' })[1]);
     expect(await screen.findByText('Decision session created.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20/options', expect.objectContaining({ body: expect.stringContaining('"title":"A"') }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions/20/options', expect.objectContaining({ body: expect.stringContaining('"title":"B"') }));
     expect(screen.getAllByText('Choose launch plan')).not.toHaveLength(0);
     expect(screen.getAllByText('Product').length).toBeGreaterThan(1);
     expect(screen.getByText('Member User')).toBeInTheDocument();
@@ -181,9 +185,9 @@ describe('session flow', () => {
     render(<App />);
 
     expect(await screen.findByText('Choose launch plan')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Active Decisions' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Draft Items' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Archived Log' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Active Decisions' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Draft Items' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Archived Log' })).toBeInTheDocument();
     expect(screen.getByText('Recent Insights')).toBeInTheDocument();
     expect(screen.getByText('4.2 Days')).toBeInTheDocument();
     expect(screen.getByText('50% Engagement')).toBeInTheDocument();
@@ -191,7 +195,7 @@ describe('session flow', () => {
     expect(screen.getByText(/opened voting for Choose launch plan/i)).toBeInTheDocument();
     expect(screen.queryByText(/Node:/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Archived Log' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Archived Log' }));
     fireEvent.click(screen.getByRole('button', { name: /Archive retention policy/i }));
 
     expect(await screen.findByRole('button', { name: 'Back to board' })).toBeInTheDocument();

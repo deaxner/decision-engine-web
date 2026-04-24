@@ -12,7 +12,7 @@ export function WorkspacePanel({
   workspaces: Workspace[];
   active: Workspace | null;
   onSelect: (workspace: Workspace) => void;
-  onCreateDecision: () => void;
+  onCreateDecision?: () => void;
 }) {
   return (
     <section className="workspace-panel">
@@ -20,7 +20,7 @@ export function WorkspacePanel({
         <>
           {active ? (
             <div className="workspace-node-card">
-              <div className="workspace-node-icon">⌘</div>
+              <div className="workspace-node-icon">WS</div>
               <div>
                 <h3>{active.name}</h3>
                 <p>{active.role === 'OWNER' ? 'Enterprise Node' : 'Team Node'}</p>
@@ -45,37 +45,30 @@ export function WorkspacePanel({
             </label>
           ) : null}
 
-          <nav className="workspace-rail-nav" aria-label="Workspace navigation">
-            <a className="active" href="#dashboard">
-              <span>▦</span>
+          <section className="workspace-rail-nav" aria-label="Workspace surfaces">
+            <div className="workspace-rail-item workspace-rail-item-active">
+              <span>DB</span>
               <span>Dashboard</span>
-            </a>
-            <a href="#team-nodes">
-              <span>⌘</span>
-              <span>Team Nodes</span>
-            </a>
-            <a href="#decision-log">
-              <span>∕</span>
-              <span>Decision Log</span>
-            </a>
-            <a href="#analytics">
-              <span>⌁</span>
-              <span>Analytics</span>
-            </a>
-            <a href="#archive">
-              <span>▤</span>
-              <span>Archive</span>
-            </a>
-          </nav>
+            </div>
+            <div className="workspace-rail-item">
+              <span>ST</span>
+              <span>Workspace settings</span>
+            </div>
+            <div className="workspace-rail-item">
+              <span>LG</span>
+              <span>Decision log</span>
+            </div>
+          </section>
 
-          <button className="workspace-rail-create" type="button" onClick={onCreateDecision}>
-            + New Decision
-          </button>
+          {onCreateDecision ? (
+            <button className="workspace-rail-create" type="button" onClick={onCreateDecision}>
+              + New Decision
+            </button>
+          ) : null}
 
-          <a className="workspace-rail-help" href="#help">
-            <span>?</span>
-            <span>Help Center</span>
-          </a>
+          <p className="workspace-rail-help">
+            Workspace actions live in the header and board.
+          </p>
         </>
       ) : null}
     </section>

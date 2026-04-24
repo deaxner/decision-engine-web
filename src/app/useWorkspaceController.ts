@@ -119,9 +119,10 @@ export function useWorkspaceController({
   }
 
   async function createWorkspace(name: string) {
+    const trimmedName = name.trim();
     const created = await api.createWorkspace(token, {
-      name,
-      slug: slugify(name) || `workspace-${Date.now()}`,
+      name: trimmedName,
+      slug: slugify(trimmedName) || `workspace-${Date.now()}`,
     });
     setWorkspaces((items) => [...items, created]);
     activeWorkspaceId.current = created.id;
@@ -142,7 +143,7 @@ export function useWorkspaceController({
       return;
     }
 
-    await api.addMember(token, workspace.id, email);
+    await api.addMember(token, workspace.id, email.trim());
     await refreshWorkspaces(auth, workspace.id);
     await refreshDashboard(workspace);
     await refreshMembers(workspace);

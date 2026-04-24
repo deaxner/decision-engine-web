@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DecisionSession } from '../types';
 
-export function OptionsPanel({ session, onAddOption }: { session: DecisionSession; onAddOption: (title: string) => void }) {
+export function OptionsPanel({ session, onAddOption }: { session: DecisionSession; onAddOption: (title: string) => Promise<boolean> }) {
   const [title, setTitle] = useState('');
 
   return (
@@ -25,8 +25,15 @@ export function OptionsPanel({ session, onAddOption }: { session: DecisionSessio
           className="inline-form"
           onSubmit={(event) => {
             event.preventDefault();
-            onAddOption(title);
-            setTitle('');
+            const nextTitle = title.trim();
+            if (!nextTitle) {
+              return;
+            }
+            void onAddOption(nextTitle).then((success) => {
+              if (success) {
+                setTitle('');
+              }
+            });
           }}
         >
           <label>
