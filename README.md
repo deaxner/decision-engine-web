@@ -11,6 +11,19 @@ permission. See [LICENSE](LICENSE).
 
 This repository owns the user-facing workspace, session, voting, and result views. It consumes the API and subscribes to Mercure topics for live result updates.
 
+## Code Map
+
+- `src/app`: shell composition, controllers, and top-level orchestration.
+- `src/api/mappers.ts`: normalization layer for backend payloads before they enter app state.
+- `src/auth`: login and registration screens.
+- `src/workspace`: workspace header, rail, and settings surfaces.
+- `src/workspace/workspaceDomain.ts`: workspace summaries and preferred-selection policy.
+- `src/sessions`: board, session detail, draft editing, and voting flows.
+- `src/sessions/sessionDomain.ts`: session-specific invariants and vote payload rules.
+- `src/results`: live and final result presentation.
+- `src/shared`: reusable UI primitives and shared hooks.
+- `src/styles`: global shell and baseline styling.
+
 ## Responsibilities
 
 - Authentication screens.
@@ -42,6 +55,12 @@ VITE_API_BASE_URL=/api
 VITE_MERCURE_URL=http://127.0.0.1:3001/.well-known/mercure
 ```
 
+## UI Behavior Notes
+
+- Modal keyboard handling is centralized in `src/shared/useDialogFocusTrap.ts`.
+- Workspace activation refreshes sessions, dashboard state, and members together from `src/App.tsx`.
+- Session search, board navigation, and result updates are treated as app-shell concerns rather than page-local state.
+
 ## Implemented MVP Flow
 
 - Register and login.
@@ -59,3 +78,5 @@ VITE_MERCURE_URL=http://127.0.0.1:3001/.well-known/mercure
 npm run build
 npm test
 ```
+
+Additional implementation notes live in [docs/repo-improvement-log.md](docs/repo-improvement-log.md).

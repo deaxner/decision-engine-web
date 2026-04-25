@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { DecisionSession, VotingType, Workspace, WorkspaceDashboard, WorkspaceMember } from '../types';
+import { useDialogFocusTrap } from '../shared/useDialogFocusTrap';
 import './sessions.css';
 
 function statusLabel(status: DecisionSession['status']) {
@@ -97,18 +98,6 @@ function formatActivityTime(value: string) {
   }).format(new Date(value));
 }
 
-function getFocusableElements(container: HTMLElement | null) {
-  if (!container) {
-    return [];
-  }
-
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-    ),
-  );
-}
-
 type BoardView = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
 export function SessionBoard({
@@ -163,6 +152,11 @@ export function SessionBoard({
     DRAFT: null,
     ARCHIVED: null,
   });
+  useDialogFocusTrap({
+    active: createOpen,
+    dialogRef,
+    onClose: () => onCreateOpenChange(false),
+  });
 
   useEffect(() => {
     if (!createOpen) {
@@ -178,57 +172,14 @@ export function SessionBoard({
   }, [createOpen]);
 
   const optionValues = options.map((item) => item.trim()).filter(Boolean);
-  const canSubmitCreate = title.trim().length > 0 && optionValues.length >= 2;
+  const uniqueOptionValues = Array.from(new Set(optionValues));
+  const canSubmitCreate = title.trim().length > 0 && uniqueOptionValues.length >= 2;
   const grouped = boardGroups(sessions);
   const visibleSessions = grouped[boardView];
   const dashboardWorkspace = dashboard?.workspace ?? workspace;
   const metrics = dashboard?.metrics;
   const insights = dashboard?.insights ?? [];
   const activity = dashboard?.activity ?? [];
-
-  useEffect(() => {
-    if (!createOpen) {
-      return;
-    }
-
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onCreateOpenChange(false);
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const focusable = getFocusableElements(dialogRef.current);
-      if (focusable.length === 0) {
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const activeElement = document.activeElement;
-
-      if (event.shiftKey && activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    const [firstFocusable] = getFocusableElements(dialogRef.current);
-    firstFocusable?.focus();
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, [createOpen, onCreateOpenChange]);
 
   function focusBoardTab(nextView: BoardView) {
     setBoardView(nextView);
@@ -278,7 +229,7 @@ export function SessionBoard({
       category: category.trim() || undefined,
       due_at: dateInputToIso(dueAt),
       assignee_ids: assigneeIds,
-      option_titles: optionValues,
+      option_titles: uniqueOptionValues,
     });
     if (created) {
       onCreateOpenChange(false);
@@ -643,9 +594,9 @@ export function SessionBoard({
                     <p className="small-heading">Ready to create</p>
                     <h3>{title || 'Untitled decision'}</h3>
                     <p className="muted">
-                      {optionValues.length >= 2
-                        ? `${optionValues.length} options will be available immediately in draft.`
-                        : 'Add at least two options before creating the draft.'}
+                      {uniqueOptionValues.length >= 2
+                        ? `${uniqueOptionValues.length} unique options will be available immediately in draft.`
+                        : 'Add at least two unique options before creating the draft.'}
                     </p>
                   </div>
                   <div className="assignee-picker">

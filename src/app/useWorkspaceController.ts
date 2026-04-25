@@ -1,25 +1,8 @@
 import { useRef, useState } from 'react';
 import { api } from '../api';
 import { slugify } from '../lib/slugify';
+import { selectPreferredWorkspace, summarizeSessions } from '../workspace/workspaceDomain';
 import type { AuthState, DecisionSession, Workspace, WorkspaceDashboard, WorkspaceMember } from '../types';
-
-function summarizeSessions(items: DecisionSession[]) {
-  return items.reduce(
-    (summary, item) => {
-      summary.total += 1;
-      if (item.status === 'DRAFT') {
-        summary.draft += 1;
-      } else if (item.status === 'OPEN') {
-        summary.open += 1;
-      } else {
-        summary.closed += 1;
-      }
-
-      return summary;
-    },
-    { total: 0, draft: 0, open: 0, closed: 0 },
-  );
-}
 
 export function useWorkspaceController({
   auth,
@@ -58,8 +41,12 @@ export function useWorkspaceController({
     }
     const items = await api.listWorkspaces(nextAuth.token);
     setWorkspaces(items);
-    const nextWorkspaceId = preferredWorkspaceId ?? activeWorkspaceId.current ?? workspace?.id ?? null;
-    const nextWorkspace = items.find((item) => item.id === nextWorkspaceId) ?? items[0] ?? null;
+    const nextWorkspace = selectPreferredWorkspace({
+      workspaces: items,
+      preferredWorkspaceId,
+      activeWorkspaceId: activeWorkspaceId.current,
+      currentWorkspaceId: workspace?.id,
+    });
     setWorkspace(nextWorkspace);
   }
 

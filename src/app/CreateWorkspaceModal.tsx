@@ -1,19 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { useDialogFocusTrap } from '../shared/useDialogFocusTrap';
 import type { useResultSubscription } from './useResultSubscription';
 import type { useSessionController } from './useSessionController';
 import type { useWorkspaceController } from './useWorkspaceController';
-
-function getFocusableElements(container: HTMLElement | null) {
-  if (!container) {
-    return [];
-  }
-
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-    ),
-  );
-}
 
 export function CreateWorkspaceModal({
   workspaceController,
@@ -27,50 +16,11 @@ export function CreateWorkspaceModal({
   run: (action: () => Promise<void>) => Promise<boolean>;
 }) {
   const dialogRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!workspaceController.createWorkspaceOpen) {
-      return;
-    }
-
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        workspaceController.setCreateWorkspaceOpen(false);
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const focusable = getFocusableElements(dialogRef.current);
-      if (focusable.length === 0) {
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const activeElement = document.activeElement;
-
-      if (event.shiftKey && activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    const [firstFocusable] = getFocusableElements(dialogRef.current);
-    firstFocusable?.focus();
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, [workspaceController.createWorkspaceOpen, workspaceController.setCreateWorkspaceOpen]);
+  useDialogFocusTrap({
+    active: workspaceController.createWorkspaceOpen,
+    dialogRef,
+    onClose: () => workspaceController.setCreateWorkspaceOpen(false),
+  });
 
   if (!workspaceController.createWorkspaceOpen) {
     return null;

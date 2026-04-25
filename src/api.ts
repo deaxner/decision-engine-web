@@ -1,3 +1,12 @@
+import {
+  normalizeDecisionOption,
+  normalizeDecisionSession,
+  normalizeSessionResult,
+  normalizeWorkspace,
+  normalizeWorkspaceDashboard,
+  normalizeWorkspaceMember,
+} from './api/mappers';
+import { buildVotePayload } from './sessions/sessionDomain';
 import type { AuthState, DecisionOption, DecisionSession, SessionResult, VotingType, Workspace, WorkspaceDashboard, WorkspaceMember } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
@@ -32,19 +41,19 @@ export const api = {
     return request<AuthState>('/login', { method: 'POST', body: JSON.stringify(payload) });
   },
   listWorkspaces(token: string) {
-    return request<Workspace[]>('/workspaces', {}, token);
+    return request<unknown[]>('/workspaces', {}, token).then((items) => items.map(normalizeWorkspace));
   },
   createWorkspace(token: string, payload: { name: string; slug: string }) {
-    return request<Workspace>('/workspaces', { method: 'POST', body: JSON.stringify(payload) }, token);
+    return request<unknown>('/workspaces', { method: 'POST', body: JSON.stringify(payload) }, token).then(normalizeWorkspace);
   },
   getWorkspace(token: string, id: string) {
-    return request<Workspace>(`/workspaces/${id}`, {}, token);
+    return request<unknown>(`/workspaces/${id}`, {}, token).then(normalizeWorkspace);
   },
   getWorkspaceDashboard(token: string, id: string) {
-    return request<WorkspaceDashboard>(`/workspaces/${id}/dashboard`, {}, token);
+    return request<unknown>(`/workspaces/${id}/dashboard`, {}, token).then(normalizeWorkspaceDashboard);
   },
   listMembers(token: string, workspaceId: string) {
-    return request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`, {}, token);
+    return request<unknown[]>(`/workspaces/${workspaceId}/members`, {}, token).then((items) => items.map(normalizeWorkspaceMember));
   },
   addMember(token: string, workspaceId: string, email: string) {
     return request<{ workspace_id: string; user_id: string; role: 'MEMBER' }>(
@@ -54,7 +63,7 @@ export const api = {
     );
   },
   listSessions(token: string, workspaceId: string) {
-    return request<DecisionSession[]>(`/workspaces/${workspaceId}/sessions`, {}, token);
+    return request<unknown[]>(`/workspaces/${workspaceId}/sessions`, {}, token).then((items) => items.map(normalizeDecisionSession));
   },
   createSession(
     token: string,
@@ -72,30 +81,25 @@ export const api = {
       `/workspaces/${workspaceId}/sessions`,
       { method: 'POST', body: JSON.stringify(payload) },
       token,
-    );
+    ).then(normalizeDecisionSession);
   },
   getSession(token: string, sessionId: string) {
-    return request<DecisionSession>(`/sessions/${sessionId}`, {}, token);
+    return request<unknown>(`/sessions/${sessionId}`, {}, token).then(normalizeDecisionSession);
   },
   addOption(token: string, sessionId: string, title: string) {
-    return request<DecisionOption>(`/sessions/${sessionId}/options`, { method: 'POST', body: JSON.stringify({ title }) }, token);
+    return request<unknown>(`/sessions/${sessionId}/options`, { method: 'POST', body: JSON.stringify({ title }) }, token).then(normalizeDecisionOption);
   },
   updateSessionStatus(token: string, sessionId: string, status: 'OPEN' | 'CLOSED') {
-    return request<DecisionSession>(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);
+    return request<unknown>(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ status }) }, token).then(normalizeDecisionSession);
   },
   castVote(token: string, session: DecisionSession, optionIds: string[]) {
-    const payload =
-      session.voting_type === 'MAJORITY'
-        ? { version: 1, type: 'MAJORITY', data: { choice: optionIds[0] } }
-        : { version: 1, type: 'RANKED_IRV', data: { ranking: optionIds } };
-
     return request<{ vote_id: string; session_id: string; status: 'accepted' }>(
       `/sessions/${session.id}/votes`,
-      { method: 'POST', body: JSON.stringify(payload) },
+      { method: 'POST', body: JSON.stringify(buildVotePayload(session, optionIds)) },
       token,
     );
   },
   getResult(token: string, sessionId: string) {
-    return request<SessionResult | null>(`/sessions/${sessionId}/results`, {}, token);
+    return request<unknown>(`/sessions/${sessionId}/results`, {}, token).then(normalizeSessionResult);
   },
 };

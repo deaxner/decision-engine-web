@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { api } from '../api';
+import { normalizeCreateSessionDraft, normalizeOptionTitle } from '../sessions/sessionDomain';
 import type { AuthState, DecisionSession, VotingType, Workspace } from '../types';
 
 export type CanvasMode = 'board' | 'detail' | 'settings';
@@ -123,7 +124,8 @@ export function useSessionController({
       return;
     }
 
-    const { option_titles: optionTitles = [], ...sessionPayload } = payload;
+    const normalizedDraft = normalizeCreateSessionDraft(payload);
+    const { option_titles: optionTitles = [], ...sessionPayload } = normalizedDraft;
     let created = await api.createSession(token, workspace.id, sessionPayload);
     for (const optionTitle of optionTitles) {
       await api.addOption(token, created.id, optionTitle);
@@ -153,7 +155,7 @@ export function useSessionController({
       return;
     }
 
-    await api.addOption(token, session.id, title.trim());
+    await api.addOption(token, session.id, normalizeOptionTitle(title));
     await refreshSession(session);
     await refreshSessions(workspace);
     await refreshDashboard(workspace);
